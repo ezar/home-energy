@@ -15,7 +15,7 @@ export default async function ConsumoPage() {
   const now = new Date()
   const today = startOfDay(now)
 
-  const [hourlyResult, pvpcResult, monthlyRawResult] = await Promise.all([
+  const [hourlyResult, pvpcResult, dailyRawResult, monthlyRawResult] = await Promise.all([
     supabase
       .from('consumption')
       .select('datetime, consumption_kwh, period')
@@ -27,6 +27,13 @@ export default async function ConsumoPage() {
       .from('pvpc_prices')
       .select('datetime, price_eur_kwh')
       .gte('datetime', subDays(today, 1).toISOString())
+      .order('datetime', { ascending: true }),
+
+    supabase
+      .from('consumption')
+      .select('datetime, consumption_kwh, period')
+      .eq('user_id', user.id)
+      .gte('datetime', subDays(today, 30).toISOString())
       .order('datetime', { ascending: true }),
 
     supabase
@@ -43,6 +50,7 @@ export default async function ConsumoPage() {
 
   const hourlyRows = (hourlyResult.data ?? []) as HourlyRow[]
   const pvpcRows = (pvpcResult.data ?? []) as PvpcRow[]
+  const dailyRows = (dailyRawResult.data ?? []) as HourlyRow[]
   const monthlyRows = (monthlyRawResult.data ?? []) as MonthlyRow[]
 
   const pvpcMap = new Map<string, number>(pvpcRows.map((p) => [p.datetime, p.price_eur_kwh]))
@@ -61,7 +69,7 @@ export default async function ConsumoPage() {
   })
 
   const dailyMap = new Map<string, { totalKwh: number; costEur: number; p1: number; p2: number; p3: number }>()
-  for (const r of hourlyRows) {
+  for (const r of dailyRows) {
     const dateKey = format(new Date(r.datetime), 'yyyy-MM-dd')
     const existing = dailyMap.get(dateKey) ?? { totalKwh: 0, costEur: 0, p1: 0, p2: 0, p3: 0 }
     const price = pvpcMap.get(r.datetime) ?? 0
