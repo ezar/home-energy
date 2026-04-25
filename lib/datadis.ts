@@ -36,18 +36,23 @@ export async function getToken(username: string, password: string): Promise<stri
   return token.trim()
 }
 
-async function datadisGet<T>(token: string, path: string, params: Record<string, string>): Promise<T> {
+async function datadisGet<T>(token: string, path: string, params: Record<string, string>, attempt = 1): Promise<T> {
   const url = new URL(`${BASE_URL}${path}`)
   Object.entries(params).forEach(([k, v]) => url.searchParams.set(k, v))
 
   const res = await fetch(url.toString(), {
     headers: { Authorization: `Bearer ${token}` },
-    // No cache — datos en tiempo real
     cache: 'no-store',
   })
 
   if (res.status === 401) throw new Error('Datadis token expirado o inválido')
-  if (res.status === 429) throw new Error('Datadis rate limit superado — espera 1 segundo entre llamadas')
+
+  if (res.status === 429) {
+    if (attempt >= 4) throw new Error('Datadis rate limit: demasiados reintentos')
+    await delay(attempt * 2000)
+    return datadisGet<T>(token, path, params, attempt + 1)
+  }
+
   if (!res.ok) throw new Error(`Datadis error ${res.status} en ${path}`)
 
   return res.json() as Promise<T>
@@ -77,7 +82,7 @@ export async function getConsumption(
   token: string,
   params: GetConsumptionParams
 ): Promise<DatadisConsumptionResponse> {
-  await delay(1000) // Respetar rate limit
+  await delay(1500) // Respetar rate limit
 
   const queryParams: Record<string, string> = {
     cups: params.cups,
@@ -104,7 +109,7 @@ export async function getMaxPower(
   token: string,
   params: GetMaxPowerParams
 ): Promise<DatadisMaxPowerResponse> {
-  await delay(1000)
+  await delay(1500)
 
   const queryParams: Record<string, string> = {
     cups: params.cups,
@@ -123,7 +128,7 @@ export async function getContractDetail(
   distributorCode: string,
   authorizedNif?: string
 ): Promise<DatadisContractResponse> {
-  await delay(1000)
+  await delay(1500)
 
   const params: Record<string, string> = { cups, distributorCode }
   if (authorizedNif) params.authorizedNif = authorizedNif
