@@ -14,7 +14,7 @@ function formatDateParam(date: Date): string {
   return `${date.getFullYear()}-${pad(date.getMonth() + 1)}-${pad(date.getDate())}T${pad(date.getHours())}:${pad(date.getMinutes())}`
 }
 
-export async function getPvpcPrices(startDate: Date, endDate: Date): Promise<PvpcPrice[]> {
+async function fetchPvpcChunk(startDate: Date, endDate: Date): Promise<PvpcPrice[]> {
   const url = new URL(`${BASE_URL}${PVPC_ENDPOINT}`)
   url.searchParams.set('start_date', formatDateParam(startDate))
   url.searchParams.set('end_date', formatDateParam(endDate))
@@ -34,26 +34,33 @@ export async function getPvpcPrices(startDate: Date, endDate: Date): Promise<Pvp
 
   const data = (await res.json()) as RedataResponse
 
-  // Buscar el indicador PVPC en los datos incluidos
   const pvpcData = data.included?.find(
     (item) => item.id === PVPC_INDICATOR_ID || item.type === 'PVPC'
-  )
+  ) ?? data.included?.[0]
 
-  if (!pvpcData?.attributes?.values) {
-    // Intentar con el primero disponible si no encontramos por id exacto
-    const firstData = data.included?.[0]
-    if (!firstData?.attributes?.values) return []
-
-    return firstData.attributes.values.map((v) => ({
-      datetime: v.datetime,
-      priceEurKwh: v.value / 1000, // La API devuelve €/MWh → convertir a €/kWh
-    }))
-  }
+  if (!pvpcData?.attributes?.values) return []
 
   return pvpcData.attributes.values.map((v) => ({
     datetime: v.datetime,
-    priceEurKwh: v.value / 1000,
+    priceEurKwh: v.value / 1000, // €/MWh → €/kWh
   }))
+}
+
+// REData limita a ~1 mes por petición — dividimos en chunks de 27 días
+export async function getPvpcPrices(startDate: Date, endDate: Date): Promise<PvpcPrice[]> {
+  const CHUNK_DAYS = 27
+  const results: PvpcPrice[] = []
+  const chunkMs = CHUNK_DAYS * 24 * 60 * 60 * 1000
+
+  let cursor = new Date(startDate)
+  while (cursor < endDate) {
+    const chunkEnd = new Date(Math.min(cursor.getTime() + chunkMs, endDate.getTime()))
+    const chunk = await fetchPvpcChunk(cursor, chunkEnd)
+    results.push(...chunk)
+    cursor = new Date(chunkEnd.getTime() + 1)
+  }
+
+  return results
 }
 
 // Conveniencia: obtener precios del día actual
