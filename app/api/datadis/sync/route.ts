@@ -1,14 +1,13 @@
 // POST /api/datadis/sync
-// Sincroniza consumo Datadis + precios PVPC para el usuario autenticado.
+// Sincroniza consumo Datadis para el usuario autenticado.
 // Siempre server-side — las credenciales nunca llegan al cliente.
 
 import { NextResponse } from 'next/server'
 import { createClient, createServiceClient } from '@/lib/supabase/server'
 import { getToken, getConsumption, getMaxPower, datadisDatetimeToDate } from '@/lib/datadis'
-import { getPvpcPrices } from '@/lib/redata'
 import { getPeriod } from '@/lib/tariff'
 import type { SyncResult } from '@/lib/types/consumption'
-import type { ProfileRow, ConsumptionInsert, PvpcPriceInsert, MaximeterInsert } from '@/lib/supabase/types-helper'
+import type { ProfileRow, ConsumptionInsert, MaximeterInsert } from '@/lib/supabase/types-helper'
 import { format, subMonths, startOfMonth } from 'date-fns'
 
 export const dynamic = 'force-dynamic'
@@ -84,24 +83,6 @@ export async function POST() {
       consumptionSynced = rows.length
     }
 
-    const pvpcPrices = await getPvpcPrices(startDate, now)
-    let pvpcSynced = 0
-
-    if (pvpcPrices.length > 0) {
-      const pvpcRows: PvpcPriceInsert[] = pvpcPrices.map((p) => ({
-        datetime: p.datetime,
-        price_eur_kwh: p.priceEurKwh,
-      }))
-
-      
-      await (serviceClient as any)
-        .from('pvpc_prices')
-        .upsert(pvpcRows, { onConflict: 'datetime' })
-
-      pvpcSynced = pvpcRows.length
-    }
-
-    
     await (serviceClient as any)
       .from('profiles')
       .update({ last_sync_at: new Date().toISOString() })
@@ -139,7 +120,7 @@ export async function POST() {
       synced: consumptionSynced,
       from: startDate.toISOString(),
       to: now.toISOString(),
-      pvpcSynced,
+      pvpcSynced: 0,
     }
     return NextResponse.json(result)
   } catch (err) {

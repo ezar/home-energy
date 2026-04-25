@@ -7,7 +7,7 @@ import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card'
 import { Badge } from '@/components/ui/badge'
-import { Loader2, CheckCircle2, AlertCircle, ShieldCheck } from 'lucide-react'
+import { Loader2, CheckCircle2, AlertCircle, ShieldCheck, RefreshCw, Zap } from 'lucide-react'
 import type { ProfileRow } from '@/lib/supabase/types-helper'
 import type { DatadisSupply } from '@/lib/types/datadis'
 
@@ -27,8 +27,12 @@ export function ConfigForm({ profile }: ConfigFormProps) {
 
   const [saving, setSaving] = useState(false)
   const [testing, setTesting] = useState(false)
+  const [syncingDatadis, setSyncingDatadis] = useState(false)
+  const [syncingPvpc, setSyncingPvpc] = useState(false)
   const [saveMsg, setSaveMsg] = useState<{ ok: boolean; text: string } | null>(null)
   const [testResult, setTestResult] = useState<{ ok: boolean; supplies?: DatadisSupply[]; error?: string } | null>(null)
+  const [syncDatadisMsg, setSyncDatadisMsg] = useState<{ ok: boolean; text: string } | null>(null)
+  const [syncPvpcMsg, setSyncPvpcMsg] = useState<{ ok: boolean; text: string } | null>(null)
 
   async function handleSave(e: React.FormEvent) {
     e.preventDefault()
@@ -63,6 +67,42 @@ export function ConfigForm({ profile }: ConfigFormProps) {
     }
 
     setSaving(false)
+  }
+
+  async function handleSyncDatadis() {
+    setSyncingDatadis(true)
+    setSyncDatadisMsg(null)
+    try {
+      const res = await fetch('/api/datadis/sync', { method: 'POST' })
+      const data = await res.json()
+      if (!res.ok) {
+        setSyncDatadisMsg({ ok: false, text: data.error ?? 'Error al sincronizar' })
+      } else {
+        setSyncDatadisMsg({ ok: true, text: `${data.synced} registros sincronizados` })
+      }
+    } catch {
+      setSyncDatadisMsg({ ok: false, text: 'Error de red' })
+    } finally {
+      setSyncingDatadis(false)
+    }
+  }
+
+  async function handleSyncPvpc() {
+    setSyncingPvpc(true)
+    setSyncPvpcMsg(null)
+    try {
+      const res = await fetch('/api/pvpc/sync', { method: 'POST' })
+      const data = await res.json()
+      if (!res.ok) {
+        setSyncPvpcMsg({ ok: false, text: data.error ?? 'Error al sincronizar' })
+      } else {
+        setSyncPvpcMsg({ ok: true, text: `${data.pvpcSynced} precios sincronizados` })
+      }
+    } catch {
+      setSyncPvpcMsg({ ok: false, text: 'Error de red' })
+    } finally {
+      setSyncingPvpc(false)
+    }
   }
 
   async function handleTestConnection() {
@@ -224,6 +264,55 @@ export function ConfigForm({ profile }: ConfigFormProps) {
                   </div>
                 )}
               </div>
+            )}
+          </div>
+        </CardContent>
+      </Card>
+
+      <Card>
+        <CardHeader>
+          <CardTitle className="text-base">Sincronización manual</CardTitle>
+          <CardDescription className="text-xs">Actualiza los datos sin esperar al cron diario</CardDescription>
+        </CardHeader>
+        <CardContent className="flex flex-wrap gap-4">
+          <div className="space-y-2">
+            <Button
+              type="button"
+              variant="outline"
+              size="sm"
+              onClick={handleSyncDatadis}
+              disabled={syncingDatadis}
+            >
+              {syncingDatadis
+                ? <Loader2 className="h-4 w-4 mr-2 animate-spin" />
+                : <RefreshCw className="h-4 w-4 mr-2" />}
+              Recargar Datadis
+            </Button>
+            {syncDatadisMsg && (
+              <p className={`text-xs flex items-center gap-1 ${syncDatadisMsg.ok ? 'text-green-400' : 'text-destructive'}`}>
+                {syncDatadisMsg.ok ? <CheckCircle2 className="h-3 w-3" /> : <AlertCircle className="h-3 w-3" />}
+                {syncDatadisMsg.text}
+              </p>
+            )}
+          </div>
+          <div className="space-y-2">
+            <Button
+              type="button"
+              variant="outline"
+              size="sm"
+              onClick={handleSyncPvpc}
+              disabled={syncingPvpc}
+            >
+              {syncingPvpc
+                ? <Loader2 className="h-4 w-4 mr-2 animate-spin" />
+                : <Zap className="h-4 w-4 mr-2" />}
+              Recargar PVPC
+            </Button>
+            {syncPvpcMsg && (
+              <p className={`text-xs flex items-center gap-1 ${syncPvpcMsg.ok ? 'text-green-400' : 'text-destructive'}`}>
+                {syncPvpcMsg.ok ? <CheckCircle2 className="h-3 w-3" /> : <AlertCircle className="h-3 w-3" />}
+                {syncPvpcMsg.text}
+              </p>
             )}
           </div>
         </CardContent>
