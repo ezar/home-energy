@@ -2,28 +2,31 @@
 
 import { useRouter } from 'next/navigation'
 import { createClient } from '@/lib/supabase/client'
-import { Button } from '@/components/ui/button'
 import { LogOut } from 'lucide-react'
 
 export function SignOutButton() {
   const router = useRouter()
-  const supabase = createClient()
 
   async function handleSignOut() {
+    const supabase = createClient()
     await supabase.auth.signOut()
     router.push('/login')
     router.refresh()
   }
 
   return (
-    <Button
-      variant="ghost"
-      size="sm"
-      className="w-full justify-start text-muted-foreground hover:text-foreground px-3"
+    <button
       onClick={handleSignOut}
+      title="Cerrar sesión"
+      style={{
+        width: 32, height: 32, borderRadius: 8,
+        display: 'flex', alignItems: 'center', justifyContent: 'center',
+        cursor: 'pointer', border: '1px solid var(--border-c)',
+        background: 'var(--btn-bg)', color: 'var(--dim)',
+        transition: 'all 0.15s',
+      }}
     >
-      <LogOut className="h-4 w-4 mr-2" />
-      Salir
-    </Button>
+      <LogOut size={13} />
+    </button>
   )
 }

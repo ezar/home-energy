@@ -1,109 +1,67 @@
 'use client'
 
 import {
-  ComposedChart,
-  Bar,
-  Line,
-  XAxis,
-  YAxis,
-  CartesianGrid,
-  Tooltip,
-  Legend,
-  ResponsiveContainer,
-  Cell,
+  ComposedChart, Bar, Line, XAxis, YAxis, CartesianGrid,
+  Tooltip, ResponsiveContainer, Cell,
 } from 'recharts'
 import type { ChartDataPoint } from '@/lib/types/consumption'
-import { PERIOD_COLORS, PERIOD_NAMES } from '@/lib/tariff'
 
-interface HourlyConsumptionChartProps {
-  data: ChartDataPoint[]
-  showPvpc?: boolean
-}
+const PERIOD_COLORS: Record<number, string> = { 1: '#f87171', 2: '#fbbf24', 3: '#34d399' }
 
-function CustomTooltip({ active, payload, label }: {
-  active?: boolean
-  payload?: Array<{ name: string; value: number; color: string }>
-  label?: string
-}) {
+function CustomTooltip({ active, payload, label }: any) {
   if (!active || !payload?.length) return null
-
+  const d = payload[0]?.payload as ChartDataPoint
   return (
-    <div className="rounded-md border border-border bg-card px-3 py-2 text-xs shadow-lg space-y-1">
-      <p className="font-medium">{label}</p>
-      {payload.map((p) => (
-        <p key={p.name} style={{ color: p.color }}>
-          {p.name}: {typeof p.value === 'number' ? p.value.toFixed(3) : p.value}
-          {p.name === 'Consumo' ? ' kWh' : p.name === 'PVPC' ? ' €/kWh' : ''}
-        </p>
-      ))}
+    <div style={{
+      background: 'var(--bg2)', border: '1px solid var(--border-c)',
+      borderRadius: 8, padding: '10px 12px', fontSize: 12,
+    }}>
+      <div style={{ color: 'var(--muted-c)', marginBottom: 6 }}>{label}</div>
+      <div style={{ color: 'var(--text)', fontFamily: 'var(--font-mono)' }}>{d?.consumptionKwh?.toFixed(3)} kWh</div>
+      {d?.priceEurKwh != null && <div style={{ color: '#a78bfa', fontFamily: 'var(--font-mono)' }}>{d.priceEurKwh.toFixed(5)} €/kWh</div>}
+      {d?.estimatedCostEur != null && <div style={{ color: '#34d399', fontFamily: 'var(--font-mono)' }}>{d.estimatedCostEur.toFixed(4)} €</div>}
     </div>
   )
 }
 
-export function HourlyConsumptionChart({ data, showPvpc = false }: HourlyConsumptionChartProps) {
-  if (!data.length) {
-    return (
-      <div className="flex items-center justify-center h-64 text-muted-foreground text-sm">
-        Sin datos para el período seleccionado
-      </div>
-    )
-  }
+interface Props {
+  data: ChartDataPoint[]
+  showPvpc?: boolean
+}
+
+export function HourlyConsumptionChart({ data, showPvpc }: Props) {
+  if (!data.length) return (
+    <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', height: 180, color: 'var(--dim)', fontSize: 13 }}>
+      Sin datos
+    </div>
+  )
 
   return (
-    <ResponsiveContainer width="100%" height={320}>
-      <ComposedChart data={data} margin={{ top: 4, right: showPvpc ? 48 : 8, bottom: 4, left: 0 }}>
-        <CartesianGrid strokeDasharray="3 3" stroke="hsl(var(--border))" />
-        <XAxis
-          dataKey="hour"
-          tick={{ fontSize: 11, fill: 'hsl(var(--muted-foreground))' }}
-          tickLine={false}
-          axisLine={false}
-          interval="preserveStartEnd"
-        />
-        <YAxis
-          yAxisId="kwh"
-          tick={{ fontSize: 11, fill: 'hsl(var(--muted-foreground))' }}
-          tickLine={false}
-          axisLine={false}
-          tickFormatter={(v: number) => `${v.toFixed(1)}`}
-          label={{ value: 'kWh', angle: -90, position: 'insideLeft', style: { fontSize: 11, fill: 'hsl(var(--muted-foreground))' } }}
-        />
+    <ResponsiveContainer width="100%" height={180}>
+      <ComposedChart data={data} margin={{ top: 4, right: showPvpc ? 44 : 8, bottom: 0, left: -10 }}>
+        <defs>
+          {[1, 2, 3].map(p => (
+            <linearGradient key={p} id={`hbar-${p}`} x1="0" y1="0" x2="0" y2="1">
+              <stop offset="0%" stopColor={PERIOD_COLORS[p]} stopOpacity={0.95} />
+              <stop offset="100%" stopColor={PERIOD_COLORS[p]} stopOpacity={0.45} />
+            </linearGradient>
+          ))}
+        </defs>
+        <CartesianGrid strokeDasharray="3 3" stroke="var(--grid-line)" vertical={false} />
+        <XAxis dataKey="hour" tick={{ fontSize: 10, fill: 'var(--dim)' }} tickLine={false} axisLine={false} interval={3} />
+        <YAxis yAxisId="kwh" tick={{ fontSize: 10, fill: 'var(--dim)' }} tickLine={false} axisLine={false} tickFormatter={(v: number) => v.toFixed(1)} width={32} />
         {showPvpc && (
-          <YAxis
-            yAxisId="pvpc"
-            orientation="right"
-            tick={{ fontSize: 11, fill: '#60a5fa' }}
-            tickLine={false}
-            axisLine={false}
-            tickFormatter={(v: number) => `${(v * 1000).toFixed(0)}`}
-            label={{ value: '€/MWh', angle: 90, position: 'insideRight', style: { fontSize: 11, fill: '#60a5fa' } }}
-          />
+          <YAxis yAxisId="pvpc" orientation="right" tick={{ fontSize: 10, fill: '#a78bfa' }} tickLine={false} axisLine={false} tickFormatter={(v: number) => v.toFixed(2)} width={44} />
         )}
         <Tooltip content={<CustomTooltip />} />
-        <Legend
-          wrapperStyle={{ fontSize: 12, paddingTop: 8 }}
-          formatter={(value: string) => <span style={{ color: 'hsl(var(--muted-foreground))' }}>{value}</span>}
-        />
-        <Bar yAxisId="kwh" dataKey="consumptionKwh" name="Consumo" radius={[2, 2, 0, 0]}>
-          {data.map((entry, index) => (
-            <Cell
-              key={`cell-${index}`}
-              fill={entry.period ? PERIOD_COLORS[entry.period] : '#6b7280'}
-              fillOpacity={0.85}
-            />
+        <Bar yAxisId="kwh" dataKey="consumptionKwh" radius={[2, 2, 0, 0]} maxBarSize={24}>
+          {data.map((d, i) => (
+            <Cell key={i} fill={`url(#hbar-${d.period ?? 3})`} />
           ))}
         </Bar>
         {showPvpc && (
-          <Line
-            yAxisId="pvpc"
-            type="monotone"
-            dataKey="priceEurKwh"
-            name="PVPC"
-            stroke="#60a5fa"
-            strokeWidth={2}
-            dot={false}
-            connectNulls
-          />
+          <Line yAxisId="pvpc" dataKey="priceEurKwh" stroke="#a78bfa" strokeWidth={1.5}
+            dot={false} activeDot={{ r: 3, fill: '#a78bfa' }} connectNulls />
         )}
       </ComposedChart>
     </ResponsiveContainer>

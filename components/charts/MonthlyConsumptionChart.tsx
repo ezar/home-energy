@@ -1,63 +1,35 @@
 'use client'
 
-import {
-  BarChart,
-  Bar,
-  XAxis,
-  YAxis,
-  CartesianGrid,
-  Tooltip,
-  ResponsiveContainer,
-} from 'recharts'
+import { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer } from 'recharts'
 import type { MonthlySummary } from '@/lib/types/consumption'
-import { format, parseISO } from 'date-fns'
-import { es } from 'date-fns/locale'
 
-interface MonthlyConsumptionChartProps {
-  data: MonthlySummary[]
-}
+interface Props { data: MonthlySummary[] }
 
-export function MonthlyConsumptionChart({ data }: MonthlyConsumptionChartProps) {
-  if (!data.length) {
-    return (
-      <div className="flex items-center justify-center h-64 text-muted-foreground text-sm">
-        Sin datos disponibles
-      </div>
-    )
-  }
-
-  const chartData = data.map((d) => ({
-    ...d,
-    label: format(parseISO(`${d.month}-01`), 'MMM yy', { locale: es }),
-  }))
+export function MonthlyConsumptionChart({ data }: Props) {
+  if (!data.length) return (
+    <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', height: 280, color: 'var(--dim)', fontSize: 13 }}>
+      Sin datos
+    </div>
+  )
 
   return (
     <ResponsiveContainer width="100%" height={280}>
-      <BarChart data={chartData} margin={{ top: 4, right: 8, bottom: 4, left: 0 }}>
-        <CartesianGrid strokeDasharray="3 3" stroke="hsl(var(--border))" />
-        <XAxis
-          dataKey="label"
-          tick={{ fontSize: 11, fill: 'hsl(var(--muted-foreground))' }}
-          tickLine={false}
-          axisLine={false}
-        />
-        <YAxis
-          tick={{ fontSize: 11, fill: 'hsl(var(--muted-foreground))' }}
-          tickLine={false}
-          axisLine={false}
-          tickFormatter={(v: number) => `${v.toFixed(0)}`}
-        />
+      <BarChart data={data} margin={{ top: 4, right: 8, bottom: 4, left: -10 }}>
+        <defs>
+          <linearGradient id="mbar-violet" x1="0" y1="0" x2="0" y2="1">
+            <stop offset="0%" stopColor="#a78bfa" stopOpacity={0.9} />
+            <stop offset="100%" stopColor="#a78bfa" stopOpacity={0.35} />
+          </linearGradient>
+        </defs>
+        <CartesianGrid strokeDasharray="3 3" stroke="var(--grid-line)" vertical={false} />
+        <XAxis dataKey="month" tick={{ fontSize: 10, fill: 'var(--dim)' }} tickLine={false} axisLine={false} />
+        <YAxis tick={{ fontSize: 10, fill: 'var(--dim)' }} tickLine={false} axisLine={false} tickFormatter={(v: number) => `${v}`} width={36} />
         <Tooltip
-          formatter={(value: number) => [`${value.toFixed(1)} kWh`, 'Consumo']}
-          contentStyle={{
-            backgroundColor: 'hsl(var(--card))',
-            border: '1px solid hsl(var(--border))',
-            borderRadius: '6px',
-            fontSize: 12,
-          }}
-          labelStyle={{ color: 'hsl(var(--foreground))' }}
+          formatter={(v: number) => [`${v} kWh`, 'Consumo']}
+          contentStyle={{ background: 'var(--bg2)', border: '1px solid var(--border-c)', borderRadius: 8, fontSize: 12 }}
+          labelStyle={{ color: 'var(--muted-c)' }}
         />
-        <Bar dataKey="totalKwh" name="Consumo" fill="#60a5fa" radius={[2, 2, 0, 0]} fillOpacity={0.85} />
+        <Bar dataKey="totalKwh" fill="url(#mbar-violet)" radius={[2, 2, 0, 0]} maxBarSize={28} />
       </BarChart>
     </ResponsiveContainer>
   )
