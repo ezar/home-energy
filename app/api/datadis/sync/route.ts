@@ -6,7 +6,7 @@ import { createClient, createServiceClient } from '@/lib/supabase/server'
 import { getToken, getConsumption, datadisDatetimeToDate } from '@/lib/datadis'
 import { getPeriod } from '@/lib/tariff'
 import type { ProfileRow, ConsumptionInsert } from '@/lib/supabase/types-helper'
-import { format, subMonths, subDays, startOfMonth, parseISO } from 'date-fns'
+import { format, subMonths, subDays, startOfMonth, addMonths, parseISO, isBefore } from 'date-fns'
 import { es } from 'date-fns/locale'
 
 export const dynamic = 'force-dynamic'
@@ -91,29 +91,56 @@ export async function POST() {
     const token = await getToken(datadis_username!, datadis_password_encrypted!)
     send('ok', 'Token obtenido')
 
-    // ── Rango de fechas ───────────────────────────────────────────────
+    // ── Chunks mensuales ─────────────────────────────────────────────
+    // Datadis da 429 si el rango es demasiado grande — máx 1 mes por petición
     const now = new Date()
     const startDate = last_sync_at
       ? subDays(parseISO(last_sync_at), 5)
       : startOfMonth(subMonths(now, 2))
 
-    const fromLabel = format(startDate, 'dd MMM yyyy', { locale: es })
-    const toLabel = format(now, 'dd MMM yyyy', { locale: es })
-    send('info', `Consultando consumo del ${fromLabel} al ${toLabel}...`)
+    const months: Date[] = []
+    let cursor = startOfMonth(startDate)
+    while (isBefore(cursor, now)) {
+      months.push(cursor)
+      cursor = addMonths(cursor, 1)
+    }
 
-    // ── Consumo ───────────────────────────────────────────────────────
-    const consumptionData = await getConsumption(token, {
-      cups: cups!,
-      distributorCode: distributor_code!,
-      startDate: toDatadisMonth(startDate),
-      endDate: toDatadisMonth(now),
-      measurementType: '0',
-      pointType: String(point_type ?? 5),
-      authorizedNif: datadis_authorized_nif ?? undefined,
-    })
+    send('info', `Rango: ${format(startDate, 'dd MMM yyyy', { locale: es })} → ${format(now, 'dd MMM yyyy', { locale: es })} (${months.length} mes${months.length !== 1 ? 'es' : ''})`)
 
-    const count = consumptionData.timeCurve?.length ?? 0
-    send('ok', `Datadis devuelve ${count} registros horarios`)
+    // ── Consumo por chunks ────────────────────────────────────────────
+    const allRows: ConsumptionInsert[] = []
+
+    for (const monthStart of months) {
+      const monthLabel = format(monthStart, 'MMM yyyy', { locale: es })
+      send('info', `Consultando ${monthLabel}...`)
+
+      const consumptionData = await getConsumption(token, {
+        cups: cups!,
+        distributorCode: distributor_code!,
+        startDate: toDatadisMonth(monthStart),
+        endDate: toDatadisMonth(monthStart),   // mismo mes en ambos extremos
+        measurementType: '0',
+        pointType: String(point_type ?? 5),
+        authorizedNif: datadis_authorized_nif ?? undefined,
+      })
+
+      const chunkCount = consumptionData.timeCurve?.length ?? 0
+      send('ok', `${monthLabel}: ${chunkCount} registros`)
+
+      for (const entry of consumptionData.timeCurve ?? []) {
+        const datetime = datadisDatetimeToDate(entry.date, entry.time)
+        allRows.push({
+          user_id: user.id,
+          cups: cups!,
+          datetime: datetime.toISOString(),
+          consumption_kwh: entry.consumptionKWh,
+          period: getPeriod(datetime),
+          obtained_by_real_or_max: entry.obtainMethod === 'Real',
+        })
+      }
+    }
+
+    const count = allRows.length
 
     if (count === 0) {
       send('warn', 'Sin datos en el rango consultado — puede ser retraso de Datadis (~2 días)')
@@ -125,17 +152,7 @@ export async function POST() {
     // ── Guardar ───────────────────────────────────────────────────────
     send('info', `Guardando ${count} registros en base de datos...`)
 
-    const rows: ConsumptionInsert[] = consumptionData.timeCurve!.map((entry) => {
-      const datetime = datadisDatetimeToDate(entry.date, entry.time)
-      return {
-        user_id: user.id,
-        cups: cups!,
-        datetime: datetime.toISOString(),
-        consumption_kwh: entry.consumptionKWh,
-        period: getPeriod(datetime),
-        obtained_by_real_or_max: entry.obtainMethod === 'Real',
-      }
-    })
+    const rows = allRows
 
     const { error: upsertError } = await (serviceClient as any)
       .from('consumption')
