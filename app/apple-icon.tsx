@@ -7,15 +7,19 @@ export default function AppleIcon() {
   return new ImageResponse(
     <div
       style={{
-        width: '100%', height: '100%',
-        background: 'linear-gradient(135deg, #1a1a1f, #111114)',
-        borderRadius: '40px',
+        width: 180, height: 180,
         display: 'flex', alignItems: 'center', justifyContent: 'center',
+        background: '#111114',
       }}
     >
-      <svg viewBox="0 0 180 180" width="120" height="120" fill="none">
-        <path d="M108 24L52 100h40l-18 56 74-80H108L108 24z" fill="#f59e0b" />
-      </svg>
+      <div style={{
+        width: 136, height: 136,
+        borderRadius: 32,
+        background: 'linear-gradient(135deg, #f59e0b, #f97316)',
+        display: 'flex', alignItems: 'center', justifyContent: 'center',
+      }}>
+        <div style={{ color: '#0f0f11', fontSize: 78, fontWeight: 900, fontFamily: 'sans-serif', lineHeight: 1 }}>E</div>
+      </div>
     </div>,
     { ...size },
   )
