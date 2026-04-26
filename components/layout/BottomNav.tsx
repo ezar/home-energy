@@ -19,15 +19,15 @@ export function BottomNav() {
       {navItems.map(({ href, label, icon: Icon }) => {
         const active = href === '/' ? pathname === '/' : pathname.startsWith(href)
         return (
-          <Link key={href} href={href} style={{ textDecoration: 'none', flex: 1 }}>
+          <Link key={href} href={href} prefetch scroll={false} style={{ textDecoration: 'none', flex: 1 }}>
             <div style={{
               display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 3,
-              padding: '6px 0',
+              padding: '8px 0',
               color: active ? 'var(--nav-active-text)' : 'var(--dim)',
-              transition: 'color 0.15s',
+              transition: 'color 0.1s',
             }}>
-              <Icon size={19} />
-              <span style={{ fontSize: 9, fontWeight: active ? 600 : 400, fontFamily: 'var(--font-sans)' }}>{label}</span>
+              <Icon size={20} />
+              <span style={{ fontSize: 9.5, fontWeight: active ? 600 : 400, fontFamily: 'var(--font-sans)' }}>{label}</span>
             </div>
           </Link>
         )

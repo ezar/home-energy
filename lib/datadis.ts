@@ -48,8 +48,10 @@ async function datadisGet<T>(token: string, path: string, params: Record<string,
   if (res.status === 401) throw new Error('Datadis token expirado o inválido')
 
   if (res.status === 429) {
-    if (attempt >= 4) throw new Error('Datadis rate limit: demasiados reintentos')
-    await delay(attempt * 2000)
+    // Un solo reintento con pausa larga — reintentos cortos no sirven si la
+    // ventana de rate limit de Datadis es de decenas de segundos
+    if (attempt > 1) throw new Error('Datadis rate limit superado — espera un momento e inténtalo de nuevo')
+    await delay(20000)
     return datadisGet<T>(token, path, params, attempt + 1)
   }
 
@@ -82,7 +84,7 @@ export async function getConsumption(
   token: string,
   params: GetConsumptionParams
 ): Promise<DatadisConsumptionResponse> {
-  await delay(1500) // Respetar rate limit
+  await delay(2000) // Respetar rate limit (~1 req/s según documentación)
 
   const queryParams: Record<string, string> = {
     cups: params.cups,
@@ -109,7 +111,7 @@ export async function getMaxPower(
   token: string,
   params: GetMaxPowerParams
 ): Promise<DatadisMaxPowerResponse> {
-  await delay(1500)
+  await delay(2000)
 
   const queryParams: Record<string, string> = {
     cups: params.cups,

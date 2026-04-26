@@ -57,7 +57,7 @@ export function Sidebar({ lastSyncAt, syncing }: SidebarProps) {
         {navItems.map(({ href, label, icon: Icon }) => {
           const active = href === '/' ? pathname === '/' : pathname.startsWith(href)
           return (
-            <Link key={href} href={href} style={{ textDecoration: 'none' }}>
+            <Link key={href} href={href} prefetch scroll={false} style={{ textDecoration: 'none' }}>
               <div style={{
                 display: 'flex', alignItems: 'center', gap: 9,
                 padding: '7px 12px', margin: '1px 8px',
