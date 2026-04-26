@@ -20,13 +20,13 @@ export default async function ConsumoPage() {
       .from('consumption')
       .select('datetime, consumption_kwh, period')
       .eq('user_id', user.id)
-      .gte('datetime', subDays(today, 1).toISOString())
+      .gte('datetime', subDays(today, 7).toISOString())
       .order('datetime', { ascending: true }),
 
     supabase
       .from('pvpc_prices')
       .select('datetime, price_eur_kwh')
-      .gte('datetime', subDays(today, 1).toISOString())
+      .gte('datetime', subDays(today, 7).toISOString())
       .order('datetime', { ascending: true }),
 
     supabase

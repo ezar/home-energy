@@ -79,7 +79,7 @@ export function ConsumptionView({ hourlyData, dailyData, monthlyData }: Props) {
           <>
             <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 12 }}>
               <div style={{ fontSize: 10.5, fontWeight: 600, color: 'var(--dim)', textTransform: 'uppercase', letterSpacing: '0.1em' }}>
-                Consumo horario · Últimas 48h
+                Consumo horario · Últimos 7 días
               </div>
               <div style={{ display: 'flex', gap: 10, flexWrap: 'wrap' }}>
                 {periods.map(p => (
