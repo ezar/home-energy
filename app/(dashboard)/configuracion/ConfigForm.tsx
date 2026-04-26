@@ -57,6 +57,7 @@ export function ConfigForm({ profile }: ConfigFormProps) {
   const [priceP3, setPriceP3] = useState(profile?.price_p3_eur_kwh?.toString() ?? '')
   const [powerKw, setPowerKw] = useState(profile?.power_kw?.toString() ?? '')
   const [powerPriceKwMonth, setPowerPriceKwMonth] = useState(profile?.power_price_eur_kw_month?.toString() ?? '')
+  const [monthlyTarget, setMonthlyTarget] = useState(profile?.monthly_kwh_target?.toString() ?? '')
 
   const [saving, setSaving] = useState(false)
   const [testing, setTesting] = useState(false)
@@ -85,6 +86,7 @@ export function ConfigForm({ profile }: ConfigFormProps) {
       price_p3_eur_kwh: tariffType === 'fixed' ? (parseFloat(priceP3) || null) : null,
       power_kw: parseFloat(powerKw) || null,
       power_price_eur_kw_month: parseFloat(powerPriceKwMonth) || null,
+      monthly_kwh_target: parseFloat(monthlyTarget) || null,
     }
     if (datadisPassword) updates.datadis_password_encrypted = datadisPassword
 
@@ -345,6 +347,16 @@ export function ConfigForm({ profile }: ConfigFormProps) {
                 <label style={LABEL}>Precio (€/kW/mes)</label>
                 <input style={{ ...INPUT, fontFamily: 'var(--font-mono)' }} value={powerPriceKwMonth} onChange={e => setPowerPriceKwMonth(e.target.value)} placeholder="3.17" type="number" step="0.01" min="0" />
               </div>
+            </div>
+          </div>
+
+          <div style={{ borderTop: '1px solid var(--border-subtle)', paddingTop: 14, marginTop: 4 }}>
+            <div style={{ fontSize: 11, color: 'var(--dim)', marginBottom: 10 }}>
+              Objetivo mensual <span style={{ color: 'var(--dim2)' }}>(opcional — avisa si vas a superar el objetivo)</span>
+            </div>
+            <div style={{ maxWidth: 160 }}>
+              <label style={LABEL}>Objetivo (kWh/mes)</label>
+              <input style={{ ...INPUT, fontFamily: 'var(--font-mono)' }} value={monthlyTarget} onChange={e => setMonthlyTarget(e.target.value)} placeholder="350" type="number" step="10" min="0" />
             </div>
           </div>
         </div>

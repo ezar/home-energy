@@ -26,7 +26,7 @@ export default async function HomePage() {
 
   const [profileResult, thisMonthResult, lastMonthResult, latestResult, pvpcNowResult, pvpc24hResult, pvpcTodayResult] =
     await Promise.all([
-      supabase.from('profiles').select('last_sync_at, cups, distributor_code, tariff_type, price_p1_eur_kwh, price_p2_eur_kwh, price_p3_eur_kwh, power_kw, power_price_eur_kw_month').eq('id', user.id).single(),
+      supabase.from('profiles').select('last_sync_at, cups, distributor_code, tariff_type, price_p1_eur_kwh, price_p2_eur_kwh, price_p3_eur_kwh, power_kw, power_price_eur_kw_month, monthly_kwh_target').eq('id', user.id).single(),
       supabase.from('consumption').select('consumption_kwh').eq('user_id', user.id).gte('datetime', startThisMonth),
       supabase.from('consumption').select('consumption_kwh').eq('user_id', user.id).gte('datetime', startLastMonth).lt('datetime', endLastMonth),
       supabase.from('consumption').select('datetime').eq('user_id', user.id).order('datetime', { ascending: false }).limit(1),
@@ -39,7 +39,7 @@ export default async function HomePage() {
   type LatestRow = Pick<ConsumptionRow, 'datetime'>
   type PvpcRow = Pick<PvpcPriceRow, 'price_eur_kwh' | 'datetime'>
 
-  const profile = profileResult.data as Pick<ProfileRow, 'last_sync_at' | 'cups' | 'distributor_code' | 'tariff_type' | 'price_p1_eur_kwh' | 'price_p2_eur_kwh' | 'price_p3_eur_kwh' | 'power_kw' | 'power_price_eur_kw_month'> | null
+  const profile = profileResult.data as Pick<ProfileRow, 'last_sync_at' | 'cups' | 'distributor_code' | 'tariff_type' | 'price_p1_eur_kwh' | 'price_p2_eur_kwh' | 'price_p3_eur_kwh' | 'power_kw' | 'power_price_eur_kw_month' | 'monthly_kwh_target'> | null
   const thisMonthRows = (thisMonthResult.data ?? []) as MonthRow[]
   const lastMonthRows = (lastMonthResult.data ?? []) as MonthRow[]
   const latestRows = (latestResult.data ?? []) as LatestRow[]
@@ -182,6 +182,51 @@ export default async function HomePage() {
           }
         />
       </div>
+
+      {/* Objetivo mensual */}
+      {profile?.monthly_kwh_target && profile.monthly_kwh_target > 0 && (() => {
+        const target = profile.monthly_kwh_target
+        const pct = Math.min((thisMonthKwh / target) * 100, 110)
+        const daysInMonth = new Date(now.getFullYear(), now.getMonth() + 1, 0).getDate()
+        const daysElapsed = now.getDate()
+        const projected = daysElapsed > 0 ? (thisMonthKwh / daysElapsed) * daysInMonth : 0
+        const willExceed = projected > target
+        const barColor = pct > 100 ? '#f87171' : pct > 80 ? '#fbbf24' : '#34d399'
+        return (
+          <div style={{
+            background: 'var(--card-grad)', border: `1px solid ${pct > 100 ? 'rgba(248,113,113,0.3)' : 'var(--border-c)'}`,
+            borderRadius: 12, padding: '14px 18px', boxShadow: 'var(--shadow-card)',
+          }}>
+            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: 10 }}>
+              <div>
+                <div style={{ fontSize: 10.5, fontWeight: 600, color: 'var(--dim)', textTransform: 'uppercase', letterSpacing: '0.1em', marginBottom: 3 }}>
+                  Objetivo mensual
+                </div>
+                <div style={{ display: 'flex', alignItems: 'baseline', gap: 6 }}>
+                  <span style={{ fontSize: 20, fontWeight: 700, color: barColor, fontFamily: 'var(--font-mono)' }}>{thisMonthKwh.toFixed(1)}</span>
+                  <span style={{ fontSize: 12, color: 'var(--muted-c)' }}>/ {target} kWh</span>
+                  <span style={{ fontSize: 12, fontWeight: 600, color: barColor }}>({pct.toFixed(0)}%)</span>
+                </div>
+              </div>
+              {willExceed && (
+                <div style={{ fontSize: 10.5, padding: '4px 10px', borderRadius: 6, background: 'rgba(248,113,113,0.12)', color: '#f87171', border: '1px solid rgba(248,113,113,0.25)', fontWeight: 500, flexShrink: 0 }}>
+                  Proyección: {projected.toFixed(0)} kWh
+                </div>
+              )}
+            </div>
+            <div style={{ height: 8, background: 'var(--bg-inset)', borderRadius: 4, overflow: 'hidden' }}>
+              <div style={{
+                width: `${Math.min(pct, 100)}%`, height: '100%', borderRadius: 4,
+                background: barColor, transition: 'width 0.4s ease',
+                boxShadow: `0 0 8px ${barColor}50`,
+              }} />
+            </div>
+            <div style={{ fontSize: 10.5, color: 'var(--dim)', marginTop: 6 }}>
+              {daysElapsed}/{daysInMonth} días · {(target - thisMonthKwh).toFixed(1)} kWh restantes
+            </div>
+          </div>
+        )
+      })()}
 
       {/* Mejor hora hoy */}
       {bestHoursToday.length > 0 && (

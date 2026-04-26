@@ -87,9 +87,22 @@ export function ConsumptionView({ hourlyData, dailyData, monthlyData }: Props) {
   const dailyTotal = filteredDaily.reduce((s, d) => s + d.totalKwh, 0)
   const dailyMax = filteredDaily.length ? Math.max(...filteredDaily.map(d => d.totalKwh)) : 0
 
-  const monthlyTotal = monthlyData.reduce((s, d) => s + d.totalKwh, 0)
-  const monthlyAvg = monthlyData.length ? monthlyTotal / monthlyData.length : 0
-  const monthlyPeak = monthlyData.length ? monthlyData.reduce((a, b) => b.totalKwh > a.totalKwh ? b : a) : null
+  const recent12 = useMemo(() => monthlyData.slice(-12), [monthlyData])
+
+  const yoyComparison = useMemo(() => {
+    const monthMap = new Map(monthlyData.map(m => [m.month, m.totalKwh]))
+    return recent12.map(m => {
+      const [year, month] = m.month.split('-')
+      const prevKey = `${parseInt(year) - 1}-${month}`
+      const prevKwh = monthMap.get(prevKey) ?? null
+      const yoyPct = prevKwh && prevKwh > 0 ? ((m.totalKwh - prevKwh) / prevKwh) * 100 : null
+      return { ...m, prevKwh, yoyPct }
+    })
+  }, [recent12, monthlyData])
+
+  const monthlyTotal = recent12.reduce((s, d) => s + d.totalKwh, 0)
+  const monthlyAvg = recent12.length ? monthlyTotal / recent12.length : 0
+  const monthlyPeak = recent12.length ? recent12.reduce((a, b) => b.totalKwh > a.totalKwh ? b : a) : null
 
   const heatmapData = useMemo(() => {
     const grid = Array.from({ length: 7 }, () => Array.from({ length: 24 }, () => ({ sum: 0, count: 0 })))
@@ -232,12 +245,37 @@ export function ConsumptionView({ hourlyData, dailyData, monthlyData }: Props) {
             <div style={{ fontSize: 10.5, fontWeight: 600, color: 'var(--dim)', textTransform: 'uppercase', letterSpacing: '0.1em', marginBottom: 12 }}>
               Consumo mensual · Últimos 12 meses
             </div>
-            <MonthlyConsumptionChart data={monthlyData} />
+            <MonthlyConsumptionChart data={recent12} />
             {statRow([
-              { label: 'Total año', val: Math.round(monthlyTotal).toString(), unit: 'kWh', color: 'var(--text)' },
+              { label: 'Total 12 meses', val: Math.round(monthlyTotal).toString(), unit: 'kWh', color: 'var(--text)' },
               { label: 'Media mensual', val: Math.round(monthlyAvg).toString(), unit: 'kWh', color: '#38bdf8' },
               { label: 'Mes pico', val: monthlyPeak?.month ?? '—', unit: `${Math.round(monthlyPeak?.totalKwh ?? 0)} kWh`, color: '#f87171' },
             ])}
+
+            {/* YoY comparison */}
+            {yoyComparison.some(m => m.yoyPct !== null) && (
+              <div style={{ marginTop: 14, borderTop: '1px solid var(--border-subtle)', paddingTop: 12 }}>
+                <div style={{ fontSize: 10, fontWeight: 600, color: 'var(--dim)', textTransform: 'uppercase', letterSpacing: '0.08em', marginBottom: 8 }}>
+                  Variación vs año anterior
+                </div>
+                <div style={{ display: 'flex', flexWrap: 'wrap', gap: 6 }}>
+                  {yoyComparison.filter(m => m.yoyPct !== null).map(m => {
+                    const up = (m.yoyPct ?? 0) > 0
+                    const color = up ? '#f87171' : '#34d399'
+                    const [, mon] = m.month.split('-')
+                    const monthNames: Record<string, string> = { '01': 'Ene', '02': 'Feb', '03': 'Mar', '04': 'Abr', '05': 'May', '06': 'Jun', '07': 'Jul', '08': 'Ago', '09': 'Sep', '10': 'Oct', '11': 'Nov', '12': 'Dic' }
+                    return (
+                      <div key={m.month} style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 2, padding: '5px 8px', borderRadius: 6, background: 'var(--bg-inset)', minWidth: 44 }}>
+                        <span style={{ fontSize: 9.5, color: 'var(--dim)' }}>{monthNames[mon] ?? mon}</span>
+                        <span style={{ fontSize: 11, fontWeight: 600, color, fontFamily: 'var(--font-mono)' }}>
+                          {up ? '+' : ''}{(m.yoyPct ?? 0).toFixed(0)}%
+                        </span>
+                      </div>
+                    )
+                  })}
+                </div>
+              </div>
+            )}
           </>
         )}
 

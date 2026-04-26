@@ -22,6 +22,7 @@ export interface Database {
           price_p3_eur_kwh: number | null
           power_kw: number | null
           power_price_eur_kw_month: number | null
+          monthly_kwh_target: number | null
         }
         Insert: {
           id: string
@@ -41,6 +42,7 @@ export interface Database {
           price_p3_eur_kwh?: number | null
           power_kw?: number | null
           power_price_eur_kw_month?: number | null
+          monthly_kwh_target?: number | null
         }
         Update: {
           id?: string
@@ -60,6 +62,7 @@ export interface Database {
           price_p3_eur_kwh?: number | null
           power_kw?: number | null
           power_price_eur_kw_month?: number | null
+          monthly_kwh_target?: number | null
         }
         Relationships: []
       }

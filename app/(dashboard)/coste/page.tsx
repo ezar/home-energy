@@ -54,29 +54,33 @@ export default async function CostePage() {
     months.map(async ({ label, shortLabel, start, end, isCurrentMonth }) => {
       const queries: [Promise<{ data: CRow[] | null }>, Promise<{ data: PRow[] | null }>] = [
         supabase.from('consumption').select('consumption_kwh, period, datetime').eq('user_id', user.id).gte('datetime', start).lt('datetime', end) as unknown as Promise<{ data: CRow[] | null }>,
-        tariffConfig.tariffType === 'pvpc'
-          ? supabase.from('pvpc_prices').select('datetime, price_eur_kwh').gte('datetime', start).lt('datetime', end) as unknown as Promise<{ data: PRow[] | null }>
-          : Promise.resolve({ data: [] as PRow[] }),
+        supabase.from('pvpc_prices').select('datetime, price_eur_kwh').gte('datetime', start).lt('datetime', end) as unknown as Promise<{ data: PRow[] | null }>,
       ]
       const [{ data: consumptionRaw }, { data: pvpcRaw }] = await Promise.all(queries)
       const consumption = (consumptionRaw ?? []) as CRow[]
       const pvpc = (pvpcRaw ?? []) as PRow[]
       const pvpcMap = new Map(pvpc.map(p => [p.datetime, p.price_eur_kwh]))
 
-      let totalKwh = 0, totalCost = 0
+      let totalKwh = 0, totalCost = 0, marketCost = 0, marketCoveredKwh = 0
       let p1Kwh = 0, p2Kwh = 0, p3Kwh = 0
       let p1Cost = 0, p2Cost = 0, p3Cost = 0
 
       const dailyMap = new Map<number, number>()
       for (const r of consumption) {
         const period = (r.period ?? 3) as 1 | 2 | 3
-        const price = getEnergyPrice(period, pvpcMap.get(r.datetime) ?? null, tariffConfig)
+        const pvpcPrice = pvpcMap.get(r.datetime) ?? null
+        const price = getEnergyPrice(period, pvpcPrice, tariffConfig)
         const cost = r.consumption_kwh * price
         totalKwh += r.consumption_kwh
         totalCost += cost
         if (period === 1) { p1Kwh += r.consumption_kwh; p1Cost += cost }
         else if (period === 2) { p2Kwh += r.consumption_kwh; p2Cost += cost }
         else { p3Kwh += r.consumption_kwh; p3Cost += cost }
+
+        if (pvpcPrice !== null) {
+          marketCost += r.consumption_kwh * pvpcPrice
+          marketCoveredKwh += r.consumption_kwh
+        }
 
         const day = getDate(new Date(r.datetime))
         dailyMap.set(day, (dailyMap.get(day) ?? 0) + cost)
@@ -89,7 +93,7 @@ export default async function CostePage() {
         dailyCumul.push({ day, cumCost: parseFloat(cum.toFixed(2)) })
       })
 
-      return { label, shortLabel, totalKwh, totalCost, p1Kwh, p2Kwh, p3Kwh, p1Cost, p2Cost, p3Cost, dailyCumul, isCurrentMonth }
+      return { label, shortLabel, totalKwh, totalCost, p1Kwh, p2Kwh, p3Kwh, p1Cost, p2Cost, p3Cost, dailyCumul, isCurrentMonth, marketCost, marketCoveredKwh }
     })
   )
 
@@ -232,6 +236,49 @@ export default async function CostePage() {
           </div>
         </div>
       </div>
+
+      {/* Eficiencia vs mercado (solo tarifa fija) */}
+      {tariffConfig.tariffType === 'fixed' && current.marketCost > 0 && (() => {
+        const savedVsMarket = current.marketCost - current.totalCost
+        const savedSign = savedVsMarket > 0
+        const savedColor = savedSign ? '#34d399' : '#f87171'
+        const avgFixed = current.totalKwh > 0 ? current.totalCost / current.totalKwh : 0
+        const avgMarket = current.marketCoveredKwh > 0 ? current.marketCost / current.marketCoveredKwh : 0
+        const coveragePct = current.totalKwh > 0 ? Math.round(current.marketCoveredKwh / current.totalKwh * 100) : 0
+        return (
+          <div style={CARD}>
+            <div style={{ fontSize: 10.5, fontWeight: 600, color: 'var(--dim)', textTransform: 'uppercase', letterSpacing: '0.1em', marginBottom: 14 }}>
+              Eficiencia vs mercado PVPC · {current.label}
+            </div>
+            <div style={{ display: 'flex', gap: 12, flexWrap: 'wrap', marginBottom: 14 }}>
+              {[
+                { label: 'Tu coste (tarifa fija)', val: current.totalCost.toFixed(2), unit: '€', color: '#60a5fa', note: `${avgFixed.toFixed(5)} €/kWh` },
+                { label: 'Coste a precio PVPC', val: current.marketCost.toFixed(2), unit: '€', color: '#a78bfa', note: `${avgMarket.toFixed(5)} €/kWh` },
+              ].map(({ label, val, unit, color, note }) => (
+                <div key={label} style={{ flex: '1 1 140px', padding: '12px 14px', borderRadius: 10, background: 'var(--bg-inset)', border: '1px solid var(--border-c)' }}>
+                  <div style={{ fontSize: 10.5, color: 'var(--dim)', marginBottom: 6 }}>{label}</div>
+                  <div style={{ fontSize: 22, fontWeight: 700, color, fontFamily: 'var(--font-mono)' }}>{val} <span style={{ fontSize: 12, color: 'var(--muted-c)', fontFamily: 'var(--font-sans)' }}>{unit}</span></div>
+                  <div style={{ fontSize: 10, color: 'var(--dim)', marginTop: 3, fontFamily: 'var(--font-mono)' }}>{note}</div>
+                </div>
+              ))}
+              <div style={{ flex: '1 1 140px', padding: '12px 14px', borderRadius: 10, background: savedSign ? 'rgba(52,211,153,0.08)' : 'rgba(248,113,113,0.08)', border: `1px solid ${savedColor}30` }}>
+                <div style={{ fontSize: 10.5, color: 'var(--dim)', marginBottom: 6 }}>{savedSign ? 'Ahorraste vs mercado' : 'Pagaste de más vs mercado'}</div>
+                <div style={{ fontSize: 22, fontWeight: 700, color: savedColor, fontFamily: 'var(--font-mono)' }}>
+                  {savedSign ? '+' : ''}{savedVsMarket.toFixed(2)} <span style={{ fontSize: 12, color: 'var(--muted-c)', fontFamily: 'var(--font-sans)' }}>€</span>
+                </div>
+                <div style={{ fontSize: 10, color: 'var(--dim)', marginTop: 3 }}>
+                  Cobertura PVPC: {coveragePct}%
+                </div>
+              </div>
+            </div>
+            {coveragePct < 90 && (
+              <p style={{ fontSize: 10.5, color: 'var(--dim2)', margin: 0 }}>
+                Cobertura de precios PVPC del {coveragePct}%. Los kWh sin precio PVPC no se incluyen en el cálculo de mercado.
+              </p>
+            )}
+          </div>
+        )
+      })()}
 
       {/* Chart + history */}
       <div className="g2">

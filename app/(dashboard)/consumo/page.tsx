@@ -41,7 +41,7 @@ export default async function ConsumoPage() {
       .from('consumption')
       .select('datetime, consumption_kwh')
       .eq('user_id', user.id)
-      .gte('datetime', startOfMonth(subMonths(now, 11)).toISOString())
+      .gte('datetime', startOfMonth(subMonths(now, 23)).toISOString())
       .order('datetime', { ascending: true }),
   ])
 
