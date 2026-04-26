@@ -51,6 +51,12 @@ export function ConfigForm({ profile }: ConfigFormProps) {
   const [cups, setCups] = useState(profile?.cups ?? '')
   const [distributorCode, setDistributorCode] = useState(profile?.distributor_code ?? '')
   const [displayName, setDisplayName] = useState(profile?.display_name ?? '')
+  const [tariffType, setTariffType] = useState<'pvpc' | 'fixed'>(profile?.tariff_type ?? 'pvpc')
+  const [priceP1, setPriceP1] = useState(profile?.price_p1_eur_kwh?.toString() ?? '')
+  const [priceP2, setPriceP2] = useState(profile?.price_p2_eur_kwh?.toString() ?? '')
+  const [priceP3, setPriceP3] = useState(profile?.price_p3_eur_kwh?.toString() ?? '')
+  const [powerKw, setPowerKw] = useState(profile?.power_kw?.toString() ?? '')
+  const [powerPriceKwMonth, setPowerPriceKwMonth] = useState(profile?.power_price_eur_kw_month?.toString() ?? '')
 
   const [saving, setSaving] = useState(false)
   const [testing, setTesting] = useState(false)
@@ -73,6 +79,12 @@ export function ConfigForm({ profile }: ConfigFormProps) {
       datadis_authorized_nif: authorizedNif || null,
       cups: cups || null,
       distributor_code: distributorCode || null,
+      tariff_type: tariffType,
+      price_p1_eur_kwh: tariffType === 'fixed' ? (parseFloat(priceP1) || null) : null,
+      price_p2_eur_kwh: tariffType === 'fixed' ? (parseFloat(priceP2) || null) : null,
+      price_p3_eur_kwh: tariffType === 'fixed' ? (parseFloat(priceP3) || null) : null,
+      power_kw: parseFloat(powerKw) || null,
+      power_price_eur_kw_month: parseFloat(powerPriceKwMonth) || null,
     }
     if (datadisPassword) updates.datadis_password_encrypted = datadisPassword
 
@@ -277,6 +289,63 @@ export function ConfigForm({ profile }: ConfigFormProps) {
                 )}
               </div>
             )}
+          </div>
+        </div>
+
+        {/* Tarifa */}
+        <div style={CARD}>
+          <div style={SECTION_LABEL}>Tarifa eléctrica</div>
+          <div style={{ display: 'flex', gap: 6, marginBottom: 16 }}>
+            {(['pvpc', 'fixed'] as const).map(t => (
+              <button key={t} type="button" onClick={() => setTariffType(t)} style={{
+                padding: '6px 14px', borderRadius: 8, cursor: 'pointer', fontSize: 12, fontWeight: 500,
+                background: tariffType === t ? 'rgba(245,158,11,0.12)' : 'var(--btn-bg)',
+                color: tariffType === t ? 'var(--nav-active-text)' : 'var(--btn-text)',
+                border: `1px solid ${tariffType === t ? 'rgba(245,158,11,0.25)' : 'var(--btn-border)'}`,
+                fontFamily: 'var(--font-sans)', transition: 'all 0.15s',
+              }}>
+                {t === 'pvpc' ? 'PVPC (variable)' : 'Tarifa fija'}
+              </button>
+            ))}
+          </div>
+
+          {tariffType === 'fixed' && (
+            <div style={{ marginBottom: 16 }}>
+              <div style={{ fontSize: 11, color: 'var(--dim)', marginBottom: 10 }}>Precio por período (€/kWh)</div>
+              <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
+                {[
+                  { label: 'P1 Punta (10–14h y 18–22h lab.)', val: priceP1, set: setPriceP1, color: '#f87171' },
+                  { label: 'P2 Llano', val: priceP2, set: setPriceP2, color: '#fbbf24' },
+                  { label: 'P3 Valle (noches y fines de semana)', val: priceP3, set: setPriceP3, color: '#34d399' },
+                ].map(({ label, val, set, color }) => (
+                  <div key={label} style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+                    <div style={{ width: 8, height: 8, borderRadius: 2, background: color, flexShrink: 0 }} />
+                    <span style={{ fontSize: 11, color: 'var(--muted-c)', flex: 1, minWidth: 0 }}>{label}</span>
+                    <input
+                      style={{ ...INPUT, width: 100, flexShrink: 0, textAlign: 'right', fontFamily: 'var(--font-mono)', fontSize: 12 }}
+                      value={val} onChange={e => set(e.target.value)}
+                      placeholder="0.12345" type="number" step="0.00001" min="0"
+                    />
+                  </div>
+                ))}
+              </div>
+            </div>
+          )}
+
+          <div style={{ borderTop: tariffType === 'fixed' ? '1px solid var(--border-subtle)' : 'none', paddingTop: tariffType === 'fixed' ? 14 : 0 }}>
+            <div style={{ fontSize: 11, color: 'var(--dim)', marginBottom: 10 }}>
+              Potencia contratada <span style={{ color: 'var(--dim2)' }}>(opcional — para calcular el término de potencia en la factura)</span>
+            </div>
+            <div className="g2" style={{ gap: 10 }}>
+              <div>
+                <label style={LABEL}>Potencia (kW)</label>
+                <input style={{ ...INPUT, fontFamily: 'var(--font-mono)' }} value={powerKw} onChange={e => setPowerKw(e.target.value)} placeholder="4.6" type="number" step="0.1" min="0" />
+              </div>
+              <div>
+                <label style={LABEL}>Precio (€/kW/mes)</label>
+                <input style={{ ...INPUT, fontFamily: 'var(--font-mono)' }} value={powerPriceKwMonth} onChange={e => setPowerPriceKwMonth(e.target.value)} placeholder="3.17" type="number" step="0.01" min="0" />
+              </div>
+            </div>
           </div>
         </div>
 

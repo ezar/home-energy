@@ -16,6 +16,12 @@ export interface Database {
           point_type: number
           last_sync_at: string | null
           created_at: string
+          tariff_type: 'pvpc' | 'fixed'
+          price_p1_eur_kwh: number | null
+          price_p2_eur_kwh: number | null
+          price_p3_eur_kwh: number | null
+          power_kw: number | null
+          power_price_eur_kw_month: number | null
         }
         Insert: {
           id: string
@@ -29,6 +35,12 @@ export interface Database {
           point_type?: number
           last_sync_at?: string | null
           created_at?: string
+          tariff_type?: 'pvpc' | 'fixed'
+          price_p1_eur_kwh?: number | null
+          price_p2_eur_kwh?: number | null
+          price_p3_eur_kwh?: number | null
+          power_kw?: number | null
+          power_price_eur_kw_month?: number | null
         }
         Update: {
           id?: string
@@ -42,6 +54,12 @@ export interface Database {
           point_type?: number
           last_sync_at?: string | null
           created_at?: string
+          tariff_type?: 'pvpc' | 'fixed'
+          price_p1_eur_kwh?: number | null
+          price_p2_eur_kwh?: number | null
+          price_p3_eur_kwh?: number | null
+          power_kw?: number | null
+          power_price_eur_kw_month?: number | null
         }
         Relationships: []
       }

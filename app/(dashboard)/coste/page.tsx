@@ -1,8 +1,12 @@
 import { createClient } from '@/lib/supabase/server'
 import { CostLineChart } from '@/components/charts/CostLineChart'
-import { startOfMonth, subMonths, format, getDate } from 'date-fns'
+import { startOfMonth, subMonths, format, getDate, getDaysInMonth } from 'date-fns'
 import { es } from 'date-fns/locale'
-import type { ConsumptionRow, PvpcPriceRow } from '@/lib/supabase/types-helper'
+import type { ConsumptionRow, PvpcPriceRow, ProfileRow } from '@/lib/supabase/types-helper'
+import {
+  tariffConfigFromProfile, getEnergyPrice,
+  monthlyPowerCost, applyTaxes, VAT_RATE, ELECTRICITY_TAX_RATE,
+} from '@/lib/pricing'
 
 export const dynamic = 'force-dynamic'
 
@@ -20,6 +24,18 @@ export default async function CostePage() {
   if (!user) return null
 
   const now = new Date()
+
+  const profileResult = await supabase
+    .from('profiles')
+    .select('tariff_type, price_p1_eur_kwh, price_p2_eur_kwh, price_p3_eur_kwh, power_kw, power_price_eur_kw_month')
+    .eq('id', user.id)
+    .single()
+
+  const tariffConfig = tariffConfigFromProfile(
+    (profileResult.data ?? {}) as Pick<ProfileRow,
+      'tariff_type' | 'price_p1_eur_kwh' | 'price_p2_eur_kwh' | 'price_p3_eur_kwh' | 'power_kw' | 'power_price_eur_kw_month'>
+  )
+
   const months = [0, 1, 2].map(offset => {
     const d = subMonths(now, offset)
     return {
@@ -36,10 +52,13 @@ export default async function CostePage() {
 
   const monthlyStats = await Promise.all(
     months.map(async ({ label, shortLabel, start, end, isCurrentMonth }) => {
-      const [{ data: consumptionRaw }, { data: pvpcRaw }] = await Promise.all([
-        supabase.from('consumption').select('consumption_kwh, period, datetime').eq('user_id', user.id).gte('datetime', start).lt('datetime', end),
-        supabase.from('pvpc_prices').select('datetime, price_eur_kwh').gte('datetime', start).lt('datetime', end),
-      ])
+      const queries: [Promise<{ data: CRow[] | null }>, Promise<{ data: PRow[] | null }>] = [
+        supabase.from('consumption').select('consumption_kwh, period, datetime').eq('user_id', user.id).gte('datetime', start).lt('datetime', end) as unknown as Promise<{ data: CRow[] | null }>,
+        tariffConfig.tariffType === 'pvpc'
+          ? supabase.from('pvpc_prices').select('datetime, price_eur_kwh').gte('datetime', start).lt('datetime', end) as unknown as Promise<{ data: PRow[] | null }>
+          : Promise.resolve({ data: [] as PRow[] }),
+      ]
+      const [{ data: consumptionRaw }, { data: pvpcRaw }] = await Promise.all(queries)
       const consumption = (consumptionRaw ?? []) as CRow[]
       const pvpc = (pvpcRaw ?? []) as PRow[]
       const pvpcMap = new Map(pvpc.map(p => [p.datetime, p.price_eur_kwh]))
@@ -48,23 +67,22 @@ export default async function CostePage() {
       let p1Kwh = 0, p2Kwh = 0, p3Kwh = 0
       let p1Cost = 0, p2Cost = 0, p3Cost = 0
 
-      for (const r of consumption) {
-        const price = pvpcMap.get(r.datetime) ?? 0
-        const cost = r.consumption_kwh * price
-        totalKwh += r.consumption_kwh; totalCost += cost
-        if (r.period === 1) { p1Kwh += r.consumption_kwh; p1Cost += cost }
-        else if (r.period === 2) { p2Kwh += r.consumption_kwh; p2Cost += cost }
-        else { p3Kwh += r.consumption_kwh; p3Cost += cost }
-      }
-
-      // Acumulado diario
-      const dailyCumul: { day: number; cumCost: number }[] = []
       const dailyMap = new Map<number, number>()
       for (const r of consumption) {
+        const period = (r.period ?? 3) as 1 | 2 | 3
+        const price = getEnergyPrice(period, pvpcMap.get(r.datetime) ?? null, tariffConfig)
+        const cost = r.consumption_kwh * price
+        totalKwh += r.consumption_kwh
+        totalCost += cost
+        if (period === 1) { p1Kwh += r.consumption_kwh; p1Cost += cost }
+        else if (period === 2) { p2Kwh += r.consumption_kwh; p2Cost += cost }
+        else { p3Kwh += r.consumption_kwh; p3Cost += cost }
+
         const day = getDate(new Date(r.datetime))
-        const price = pvpcMap.get(r.datetime) ?? 0
-        dailyMap.set(day, (dailyMap.get(day) ?? 0) + r.consumption_kwh * price)
+        dailyMap.set(day, (dailyMap.get(day) ?? 0) + cost)
       }
+
+      const dailyCumul: { day: number; cumCost: number }[] = []
       let cum = 0
       Array.from(dailyMap.entries()).sort(([a], [b]) => a - b).forEach(([day, cost]) => {
         cum += cost
@@ -78,20 +96,32 @@ export default async function CostePage() {
   const current = monthlyStats[0]
   const avgPrice = current.totalKwh > 0 ? current.totalCost / current.totalKwh : 0
 
+  // Factura breakdown
+  const powerTerm = monthlyPowerCost(tariffConfig)
+  const bill = applyTaxes(current.totalCost, powerTerm)
+
+  // Proyección fin de mes
+  const daysElapsed = getDate(now)
+  const daysInMonth = getDaysInMonth(now)
+  const projectedEnergy = daysElapsed > 0 ? current.totalCost / daysElapsed * daysInMonth : 0
+  const projectedBill = applyTaxes(projectedEnergy, powerTerm)
+
   const byPeriod = [
     { period: 1 as const, kwh: current.p1Kwh, cost: current.p1Cost },
     { period: 2 as const, kwh: current.p2Kwh, cost: current.p2Cost },
     { period: 3 as const, kwh: current.p3Kwh, cost: current.p3Cost },
   ]
 
+  const hasPower = tariffConfig.powerKw && tariffConfig.powerPriceEurKwMonth
+
   return (
     <div style={{ display: 'flex', flexDirection: 'column', gap: 12 }}>
       {/* Top stats */}
       <div className="g3">
         {[
-          { label: 'Coste total mes', val: current.totalCost.toFixed(2), unit: '€', color: 'var(--text)' },
+          { label: 'Energía (sin impuestos)', val: current.totalCost.toFixed(2), unit: '€', color: 'var(--text)' },
           { label: 'kWh consumidos', val: current.totalKwh.toFixed(1), unit: 'kWh', color: '#38bdf8' },
-          { label: 'Precio medio', val: avgPrice.toFixed(5), unit: '€/kWh', color: '#a78bfa' },
+          { label: 'Precio medio energía', val: avgPrice > 0 ? avgPrice.toFixed(5) : '—', unit: '€/kWh', color: '#a78bfa' },
         ].map(item => (
           <div key={item.label} style={CARD}>
             <div style={{ fontSize: 10.5, fontWeight: 500, color: 'var(--dim)', textTransform: 'uppercase', letterSpacing: '0.06em', marginBottom: 8 }}>{item.label}</div>
@@ -112,11 +142,11 @@ export default async function CostePage() {
             const color = PERIOD_COLORS[period]
             const pct = current.totalKwh > 0 ? Math.round(kwh / current.totalKwh * 100) : 0
             const avgP = kwh > 0 ? cost / kwh : 0
+            const fixedPrice = tariffConfig.tariffType === 'fixed'
+              ? (period === 1 ? tariffConfig.priceP1 : period === 2 ? tariffConfig.priceP2 : tariffConfig.priceP3)
+              : null
             return (
-              <div key={period} style={{
-                borderRadius: 10, padding: '14px 16px',
-                border: `1px solid ${color}30`, background: `${color}08`,
-              }}>
+              <div key={period} style={{ borderRadius: 10, padding: '14px 16px', border: `1px solid ${color}30`, background: `${color}08` }}>
                 <div style={{ display: 'flex', alignItems: 'center', gap: 6, marginBottom: 10 }}>
                   <div style={{ width: 8, height: 8, borderRadius: 2, background: color, boxShadow: `0 0 6px ${color}60` }} />
                   <span style={{ fontSize: 12, fontWeight: 600, color }}>{PERIOD_NAMES[period]}</span>
@@ -127,7 +157,10 @@ export default async function CostePage() {
                 </div>
                 <div style={{ fontSize: 14, color: '#34d399', marginTop: 3, fontFamily: 'var(--font-mono)' }}>{cost.toFixed(2)} €</div>
                 <div style={{ fontSize: 10, color: 'var(--dim)', marginTop: 6 }}>
-                  Precio medio: <span style={{ color: 'var(--muted-c)', fontFamily: 'var(--font-mono)' }}>{avgP.toFixed(5)} €/kWh</span>
+                  {fixedPrice != null
+                    ? <span>Precio fijo: <span style={{ color: 'var(--muted-c)', fontFamily: 'var(--font-mono)' }}>{fixedPrice.toFixed(5)} €/kWh</span></span>
+                    : <span>Precio medio: <span style={{ color: 'var(--muted-c)', fontFamily: 'var(--font-mono)' }}>{avgP > 0 ? avgP.toFixed(5) : '—'} €/kWh</span></span>
+                  }
                 </div>
                 <div style={{ marginTop: 8, background: 'var(--bg-inset)', borderRadius: 3, height: 3 }}>
                   <div style={{ width: `${pct}%`, height: '100%', background: color, borderRadius: 3, boxShadow: `0 0 4px ${color}50` }} />
@@ -135,6 +168,68 @@ export default async function CostePage() {
               </div>
             )
           })}
+        </div>
+      </div>
+
+      {/* Factura estimada */}
+      <div className="g2">
+        {/* Breakdown */}
+        <div style={CARD}>
+          <div style={{ fontSize: 10.5, fontWeight: 600, color: 'var(--dim)', textTransform: 'uppercase', letterSpacing: '0.1em', marginBottom: 14 }}>
+            Factura estimada · {current.label}
+          </div>
+          {[
+            { label: 'Término de energía', val: current.totalCost, color: '#60a5fa' },
+            ...(hasPower ? [{ label: `Término de potencia (${tariffConfig.powerKw} kW)`, val: powerTerm, color: '#a78bfa' }] : []),
+            { label: `Impuesto eléctrico (${(ELECTRICITY_TAX_RATE * 100).toFixed(2)}%)`, val: bill.electricityTax, color: 'var(--muted-c)' },
+            { label: `IVA (${(VAT_RATE * 100).toFixed(0)}%)`, val: bill.vat, color: 'var(--muted-c)' },
+          ].map(({ label, val, color }) => (
+            <div key={label} style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: '7px 0', borderBottom: '1px solid var(--border-subtle)' }}>
+              <span style={{ fontSize: 12, color: 'var(--dim)' }}>{label}</span>
+              <span style={{ fontSize: 13, fontWeight: 500, color, fontFamily: 'var(--font-mono)' }}>{val.toFixed(2)} €</span>
+            </div>
+          ))}
+          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', paddingTop: 10, marginTop: 4 }}>
+            <span style={{ fontSize: 13, fontWeight: 600, color: 'var(--text)' }}>Total con IVA</span>
+            <span style={{ fontSize: 20, fontWeight: 700, color: '#34d399', fontFamily: 'var(--font-mono)' }}>{bill.total.toFixed(2)} €</span>
+          </div>
+          {!hasPower && (
+            <p style={{ fontSize: 10.5, color: 'var(--dim2)', marginTop: 10 }}>
+              Configura la potencia contratada en Configuración para incluir el término de potencia.
+            </p>
+          )}
+        </div>
+
+        {/* Proyección */}
+        <div style={CARD}>
+          <div style={{ fontSize: 10.5, fontWeight: 600, color: 'var(--dim)', textTransform: 'uppercase', letterSpacing: '0.1em', marginBottom: 4 }}>
+            Proyección fin de mes
+          </div>
+          <div style={{ fontSize: 11, color: 'var(--dim2)', marginBottom: 14 }}>
+            Basada en la media de los {daysElapsed} días transcurridos
+          </div>
+          {[
+            { label: 'Energía proyectada', val: projectedEnergy.toFixed(2), unit: '€', color: '#60a5fa' },
+            ...(hasPower ? [{ label: 'Potencia (fija)', val: powerTerm.toFixed(2), unit: '€', color: '#a78bfa' }] : []),
+            { label: 'Con impuestos', val: projectedBill.total.toFixed(2), unit: '€', color: '#34d399' },
+          ].map(({ label, val, unit, color }) => (
+            <div key={label} style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: '8px 0', borderBottom: '1px solid var(--border-subtle)' }}>
+              <span style={{ fontSize: 12, color: 'var(--dim)' }}>{label}</span>
+              <span style={{ fontSize: 14, fontWeight: 600, color, fontFamily: 'var(--font-mono)' }}>{val} {unit}</span>
+            </div>
+          ))}
+          <div style={{ marginTop: 14 }}>
+            <div style={{ fontSize: 10, color: 'var(--dim)', marginBottom: 6 }}>
+              Progreso del mes ({daysElapsed}/{daysInMonth} días)
+            </div>
+            <div style={{ height: 6, background: 'var(--bg-inset)', borderRadius: 3, overflow: 'hidden' }}>
+              <div style={{
+                width: `${Math.min(100, daysElapsed / daysInMonth * 100)}%`,
+                height: '100%', borderRadius: 3,
+                background: 'linear-gradient(90deg, #f59e0b, #f97316)',
+              }} />
+            </div>
+          </div>
         </div>
       </div>
 
@@ -147,7 +242,8 @@ export default async function CostePage() {
           <CostLineChart data={current.dailyCumul} />
           {current.dailyCumul.length > 0 && (
             <div style={{ marginTop: 8, fontSize: 11.5, color: 'var(--dim)' }}>
-              Total: <span style={{ color: '#34d399', fontWeight: 600, fontFamily: 'var(--font-mono)' }}>{current.totalCost.toFixed(2)} €</span>
+              Energía: <span style={{ color: '#34d399', fontWeight: 600, fontFamily: 'var(--font-mono)' }}>{current.totalCost.toFixed(2)} €</span>
+              {hasPower && <span style={{ marginLeft: 8 }}>· Potencia: <span style={{ color: '#a78bfa', fontWeight: 600, fontFamily: 'var(--font-mono)' }}>{powerTerm.toFixed(2)} €</span></span>}
             </div>
           )}
         </div>
@@ -157,7 +253,7 @@ export default async function CostePage() {
             Histórico mensual
           </div>
           <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr 1fr' }}>
-            {['Mes', 'kWh', '€ medio', 'Coste'].map(h => (
+            {['Mes', 'kWh', '€ medio', 'Energía'].map(h => (
               <div key={h} style={{ fontSize: 9.5, fontWeight: 600, color: 'var(--dim)', textTransform: 'uppercase', letterSpacing: '0.06em', padding: '4px 8px', borderBottom: '1px solid var(--border-c)' }}>{h}</div>
             ))}
             {monthlyStats.map((m, i) => (
@@ -173,8 +269,6 @@ export default async function CostePage() {
           </div>
         </div>
       </div>
-
-      <p style={{ fontSize: 11, color: 'var(--dim)', marginTop: 4 }}>Solo término de energía (PVPC horario) — sin potencia ni impuestos</p>
     </div>
   )
 }

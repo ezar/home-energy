@@ -6,6 +6,8 @@ import { StatCard } from '@/components/dashboard/StatCard'
 import { ColorBadge } from '@/components/dashboard/PeriodBadge'
 import { PvpcBarChart } from '@/components/charts/PvpcBarChart'
 import { PvpcSparkline } from '@/components/charts/PvpcSparkline'
+import { tariffConfigFromProfile, getEnergyPrice } from '@/lib/pricing'
+import { getPeriod } from '@/lib/tariff'
 
 export const dynamic = 'force-dynamic'
 
@@ -22,7 +24,7 @@ export default async function HomePage() {
 
   const [profileResult, thisMonthResult, lastMonthResult, latestResult, pvpcNowResult, pvpc24hResult] =
     await Promise.all([
-      supabase.from('profiles').select('last_sync_at, cups, distributor_code').eq('id', user.id).single(),
+      supabase.from('profiles').select('last_sync_at, cups, distributor_code, tariff_type, price_p1_eur_kwh, price_p2_eur_kwh, price_p3_eur_kwh, power_kw, power_price_eur_kw_month').eq('id', user.id).single(),
       supabase.from('consumption').select('consumption_kwh').eq('user_id', user.id).gte('datetime', startThisMonth),
       supabase.from('consumption').select('consumption_kwh').eq('user_id', user.id).gte('datetime', startLastMonth).lt('datetime', endLastMonth),
       supabase.from('consumption').select('datetime').eq('user_id', user.id).order('datetime', { ascending: false }).limit(1),
@@ -34,12 +36,18 @@ export default async function HomePage() {
   type LatestRow = Pick<ConsumptionRow, 'datetime'>
   type PvpcRow = Pick<PvpcPriceRow, 'price_eur_kwh' | 'datetime'>
 
-  const profile = profileResult.data as Pick<ProfileRow, 'last_sync_at' | 'cups' | 'distributor_code'> | null
+  const profile = profileResult.data as Pick<ProfileRow, 'last_sync_at' | 'cups' | 'distributor_code' | 'tariff_type' | 'price_p1_eur_kwh' | 'price_p2_eur_kwh' | 'price_p3_eur_kwh' | 'power_kw' | 'power_price_eur_kw_month'> | null
   const thisMonthRows = (thisMonthResult.data ?? []) as MonthRow[]
   const lastMonthRows = (lastMonthResult.data ?? []) as MonthRow[]
   const latestRows = (latestResult.data ?? []) as LatestRow[]
   const pvpcNow = ((pvpcNowResult.data ?? []) as PvpcRow[])[0] ?? null
   const pvpc24h = (pvpc24hResult.data ?? []) as PvpcRow[]
+
+  const tariffConfig = tariffConfigFromProfile(profile ?? {})
+  const currentPeriod = getPeriod(now)
+  const currentPeriodPrice = getEnergyPrice(currentPeriod, pvpcNow?.price_eur_kwh ?? null, tariffConfig)
+  const PERIOD_NAMES: Record<number, string> = { 1: 'P1 Punta', 2: 'P2 Llano', 3: 'P3 Valle' }
+  const PERIOD_COLORS: Record<number, string> = { 1: '#f87171', 2: '#fbbf24', 3: '#34d399' }
 
   const thisMonthKwh = thisMonthRows.reduce((s, r) => s + r.consumption_kwh, 0)
   const lastMonthKwh = lastMonthRows.reduce((s, r) => s + r.consumption_kwh, 0)
@@ -103,27 +111,50 @@ export default async function HomePage() {
           }
         />
 
-        {/* PVPC */}
-        <StatCard
-          label="PVPC ahora"
-          value={pvpcNow ? pvpcNow.price_eur_kwh.toFixed(5) : '—'}
-          unit="€/kWh"
-          icon={<TrendingUp size={14} color="#a78bfa" />}
-          iconBg="rgba(167,139,250,0.1)"
-          meta={
-            <div>
-              {pvpcPrices24h.length > 0 && (
-                <div style={{ marginBottom: 4 }}>
-                  <PvpcSparkline data={pvpcPrices24h} />
+        {/* Precio ahora */}
+        {(() => {
+          const isFixed = tariffConfig.tariffType === 'fixed'
+          const priceLabel = isFixed ? 'Precio ahora' : 'PVPC ahora'
+          const priceVal = currentPeriodPrice > 0 ? currentPeriodPrice.toFixed(5) : '—'
+          const periodColor = PERIOD_COLORS[currentPeriod]
+          const cheapness = avgPvpc24h && pvpcNow
+            ? pvpcNow.price_eur_kwh < avgPvpc24h * 0.85 ? { label: 'barato', color: '#34d399' }
+            : pvpcNow.price_eur_kwh > avgPvpc24h * 1.15 ? { label: 'caro', color: '#f87171' }
+            : { label: 'normal', color: '#fbbf24' }
+            : null
+          return (
+            <StatCard
+              label={priceLabel}
+              value={priceVal}
+              unit="€/kWh"
+              icon={<TrendingUp size={14} color="#a78bfa" />}
+              iconBg="rgba(167,139,250,0.1)"
+              meta={
+                <div>
+                  <div style={{ display: 'flex', gap: 6, marginBottom: 4, alignItems: 'center' }}>
+                    <div style={{ width: 7, height: 7, borderRadius: 2, background: periodColor, flexShrink: 0 }} />
+                    <span style={{ fontSize: 10.5, color: periodColor, fontWeight: 500 }}>{PERIOD_NAMES[currentPeriod]}</span>
+                    {!isFixed && cheapness && (
+                      <span style={{ fontSize: 10, color: cheapness.color, marginLeft: 2 }}>· {cheapness.label}</span>
+                    )}
+                    {isFixed && <ColorBadge color="#60a5fa">Fija</ColorBadge>}
+                  </div>
+                  {!isFixed && pvpcPrices24h.length > 0 && (
+                    <div style={{ marginBottom: 4 }}>
+                      <PvpcSparkline data={pvpcPrices24h} />
+                    </div>
+                  )}
+                  {!isFixed && (
+                    <div style={{ display: 'flex', justifyContent: 'space-between' }}>
+                      {cheapHour !== null && <span style={{ fontSize: 10.5, color: '#34d399', fontFamily: 'var(--font-mono)' }}>↓ {cheapHour}:00</span>}
+                      {expHour !== null && <span style={{ fontSize: 10.5, color: '#f87171', fontFamily: 'var(--font-mono)' }}>↑ {expHour}:00</span>}
+                    </div>
+                  )}
                 </div>
-              )}
-              <div style={{ display: 'flex', justifyContent: 'space-between' }}>
-                {cheapHour !== null && <span style={{ fontSize: 10.5, color: '#34d399', fontFamily: 'var(--font-mono)' }}>↓ {cheapHour}:00 barato</span>}
-                {expHour !== null && <span style={{ fontSize: 10.5, color: '#f87171', fontFamily: 'var(--font-mono)' }}>↑ {expHour}:00 caro</span>}
-              </div>
-            </div>
-          }
-        />
+              }
+            />
+          )
+        })()}
 
         {/* Último dato */}
         <StatCard
