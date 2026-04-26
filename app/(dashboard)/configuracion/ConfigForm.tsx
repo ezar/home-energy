@@ -59,7 +59,6 @@ export function ConfigForm({ profile }: ConfigFormProps) {
   const [saveMsg, setSaveMsg] = useState<{ ok: boolean; text: string } | null>(null)
   const [testResult, setTestResult] = useState<{ ok: boolean; supplies?: DatadisSupply[]; error?: string } | null>(null)
   const [syncLogs, setSyncLogs] = useState<LogEntry[]>([])
-  const [syncPvpcMsg, setSyncPvpcMsg] = useState<{ ok: boolean; text: string } | null>(null)
   const logIdRef = useRef(0)
   const logBoxRef = useRef<HTMLDivElement>(null)
 
@@ -137,15 +136,31 @@ export function ConfigForm({ profile }: ConfigFormProps) {
 
   async function handleSyncPvpc() {
     setSyncingPvpc(true)
-    setSyncPvpcMsg(null)
+    setSyncLogs([])
     try {
       const res = await fetch('/api/pvpc/sync', { method: 'POST' })
-      const data = await res.json()
-      setSyncPvpcMsg(res.ok
-        ? { ok: true, text: `${data.pvpcSynced} precios sincronizados` }
-        : { ok: false, text: data.error ?? 'Error al sincronizar' })
+      if (!res.body) throw new Error('Sin respuesta del servidor')
+
+      const reader = res.body.getReader()
+      const decoder = new TextDecoder()
+      let buffer = ''
+
+      while (true) {
+        const { done, value } = await reader.read()
+        if (done) break
+        buffer += decoder.decode(value, { stream: true })
+        const lines = buffer.split('\n')
+        buffer = lines.pop() ?? ''
+        for (const line of lines) {
+          if (!line.startsWith('data: ')) continue
+          try {
+            const event = JSON.parse(line.slice(6)) as { type: string; msg: string }
+            setSyncLogs(prev => [...prev, { id: ++logIdRef.current, ...event }])
+          } catch { /* ignore malformed */ }
+        }
+      }
     } catch {
-      setSyncPvpcMsg({ ok: false, text: 'Error de red' })
+      setSyncLogs(prev => [...prev, { id: ++logIdRef.current, type: 'error', msg: 'Error de red' }])
     } finally {
       setSyncingPvpc(false)
     }
@@ -332,7 +347,7 @@ export function ConfigForm({ profile }: ConfigFormProps) {
                   <span style={{ lineHeight: 1.5 }}>{log.msg}</span>
                 </div>
               ))}
-              {syncingDatadis && (
+              {(syncingDatadis || syncingPvpc) && (
                 <div style={{ color: 'var(--dim)', display: 'flex', gap: 7 }}>
                   <Loader2 size={10} className="spin" style={{ flexShrink: 0, marginTop: 2 }} />
                   <span>Esperando respuesta...</span>
@@ -341,11 +356,6 @@ export function ConfigForm({ profile }: ConfigFormProps) {
             </div>
           )}
 
-          {syncPvpcMsg && (
-            <p style={{ fontSize: 11, marginTop: 4, color: syncPvpcMsg.ok ? '#34d399' : '#f87171', display: 'flex', alignItems: 'center', gap: 4 }}>
-              {syncPvpcMsg.ok ? <CheckCircle2 size={11} /> : <AlertCircle size={11} />} {syncPvpcMsg.text}
-            </p>
-          )}
         </div>
 
         {profile?.cups && (
