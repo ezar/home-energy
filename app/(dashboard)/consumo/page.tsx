@@ -23,10 +23,11 @@ export default async function ConsumoPage() {
       .gte('datetime', subDays(today, 30).toISOString())
       .order('datetime', { ascending: true }),
 
+    // PVPC cubre 90 días para que los costes del diario sean correctos en todos los rangos
     supabase
       .from('pvpc_prices')
       .select('datetime, price_eur_kwh')
-      .gte('datetime', subDays(today, 30).toISOString())
+      .gte('datetime', subDays(today, 90).toISOString())
       .order('datetime', { ascending: true }),
 
     supabase
