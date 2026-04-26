@@ -1,6 +1,6 @@
 import { createClient } from '@/lib/supabase/server'
 import { ConfigForm } from './ConfigForm'
-import type { ProfileRow } from '@/lib/supabase/types-helper'
+import type { ProfileRow, UserSupplyRow } from '@/lib/supabase/types-helper'
 
 export const dynamic = 'force-dynamic'
 
@@ -9,21 +9,21 @@ export default async function ConfiguracionPage() {
   const { data: { user } } = await supabase.auth.getUser()
   if (!user) return null
 
-  const { data: profileRaw } = await supabase
-    .from('profiles')
-    .select('*')
-    .eq('id', user.id)
-    .single()
+  const [{ data: profileRaw }, { data: suppliesRaw }] = await Promise.all([
+    supabase.from('profiles').select('*').eq('id', user.id).single(),
+    supabase.from('user_supplies').select('*').eq('user_id', user.id).order('created_at', { ascending: true }),
+  ])
 
   const profile = profileRaw as ProfileRow | null
+  const supplies = (suppliesRaw ?? []) as UserSupplyRow[]
 
   return (
-    <div className="p-6 max-w-2xl space-y-6">
+    <div className="p-6 space-y-6">
       <div>
         <h1 className="text-2xl font-bold">Configuración</h1>
-        <p className="text-sm text-muted-foreground mt-1">Credenciales Datadis y suministro eléctrico</p>
+        <p className="text-sm text-muted-foreground mt-1">Credenciales Datadis, suministros y notificaciones</p>
       </div>
-      <ConfigForm profile={profile} />
+      <ConfigForm profile={profile} supplies={supplies} />
     </div>
   )
 }

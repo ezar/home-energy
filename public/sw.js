@@ -40,3 +40,22 @@ self.addEventListener('fetch', e => {
       .catch(() => caches.match(e.request))
   )
 })
+
+self.addEventListener('push', e => {
+  const data = e.data?.json() ?? {}
+  e.waitUntil(
+    self.registration.showNotification(data.title ?? 'Precio eléctrico bajo', {
+      body: data.body ?? 'El PVPC ha bajado de tu umbral configurado.',
+      icon: '/icon-192x192.png',
+      badge: '/icon-192x192.png',
+      tag: 'pvpc-alert',
+      renotify: true,
+      data: { url: '/' },
+    })
+  )
+})
+
+self.addEventListener('notificationclick', e => {
+  e.notification.close()
+  e.waitUntil(clients.openWindow(e.notification.data?.url ?? '/'))
+})

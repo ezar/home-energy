@@ -16,3 +16,6 @@ export type PvpcPriceInsert = Tables['pvpc_prices']['Insert']
 
 export type MaximeterRow = Tables['maximeter']['Row']
 export type MaximeterInsert = Tables['maximeter']['Insert']
+
+export type UserSupplyRow = Tables['user_supplies']['Row']
+export type UserSupplyInsert = Tables['user_supplies']['Insert']

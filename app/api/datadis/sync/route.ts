@@ -46,6 +46,7 @@ function makeStream(run: (send: (type: LogType, msg: string) => void) => Promise
 
 export async function POST() {
   const encoder = new TextEncoder()
+  void encoder
 
   // Auth y perfil deben resolverse antes de crear el stream (usan next/headers)
   const supabase = await createClient()
@@ -70,12 +71,9 @@ export async function POST() {
   if (!profile || !profile.datadis_username || !profile.datadis_password_encrypted) {
     return makeStream(async (send) => { send('error', 'Credenciales Datadis no configuradas') })
   }
-  if (!profile.cups || !profile.distributor_code) {
-    return makeStream(async (send) => { send('error', 'CUPS o distribuidora no configurados') })
-  }
 
   // Capturar valores para usarlos en el closure
-  const { datadis_username, datadis_password_encrypted, cups, distributor_code, point_type, datadis_authorized_nif, last_sync_at } = profile
+  const { datadis_username, datadis_password_encrypted, datadis_authorized_nif, last_sync_at } = profile
 
   return makeStream(async (send) => {
     // ── Aviso rate limit ──────────────────────────────────────────────
@@ -84,6 +82,29 @@ export async function POST() {
       if (hoursSince < 20) {
         send('warn', `Última sync hace ${hoursSince.toFixed(1)}h — Datadis limita ~1 petición/día por endpoint. Si da 429 es normal.`)
       }
+    }
+
+    // ── Get active supplies ───────────────────────────────────────────
+    const { data: suppliesRaw } = await (serviceClient as any)
+      .from('user_supplies')
+      .select('cups, distributor_code, point_type, display_name')
+      .eq('user_id', user.id)
+      .eq('is_active', true)
+
+    let supplies = (suppliesRaw ?? []) as { cups: string; distributor_code: string; point_type: number; display_name: string | null }[]
+
+    // Backward compat: auto-migrate profile.cups
+    if (supplies.length === 0 && profile.cups && profile.distributor_code) {
+      await (serviceClient as any).from('user_supplies').upsert(
+        { user_id: user.id, cups: profile.cups, distributor_code: profile.distributor_code, point_type: profile.point_type ?? 5 },
+        { onConflict: 'user_id,cups' }
+      )
+      supplies = [{ cups: profile.cups, distributor_code: profile.distributor_code, point_type: profile.point_type ?? 5, display_name: null }]
+    }
+
+    if (supplies.length === 0) {
+      send('error', 'No hay suministros configurados')
+      return
     }
 
     // ── Token ─────────────────────────────────────────────────────────
@@ -107,36 +128,40 @@ export async function POST() {
 
     send('info', `Rango: ${format(startDate, 'dd MMM yyyy', { locale: es })} → ${format(now, 'dd MMM yyyy', { locale: es })} (${months.length} mes${months.length !== 1 ? 'es' : ''})`)
 
-    // ── Consumo por chunks ────────────────────────────────────────────
+    // ── Consumo por suministro y chunks ───────────────────────────────
     const allRows: ConsumptionInsert[] = []
 
-    for (const monthStart of months) {
-      const monthLabel = format(monthStart, 'MMM yyyy', { locale: es })
-      send('info', `Consultando ${monthLabel}...`)
+    for (const supply of supplies) {
+      send('info', `Suministro: ${supply.display_name ?? supply.cups}`)
 
-      const consumptionData = await getConsumption(token, {
-        cups: cups!,
-        distributorCode: distributor_code!,
-        startDate: toDatadisMonth(monthStart),
-        endDate: toDatadisMonth(monthStart),   // mismo mes en ambos extremos
-        measurementType: '0',
-        pointType: String(point_type ?? 5),
-        authorizedNif: datadis_authorized_nif ?? undefined,
-      })
+      for (const monthStart of months) {
+        const monthLabel = format(monthStart, 'MMM yyyy', { locale: es })
+        send('info', `Consultando ${monthLabel}...`)
 
-      const chunkCount = consumptionData.timeCurve?.length ?? 0
-      send('ok', `${monthLabel}: ${chunkCount} registros`)
-
-      for (const entry of consumptionData.timeCurve ?? []) {
-        const datetime = datadisDatetimeToDate(entry.date, entry.time)
-        allRows.push({
-          user_id: user.id,
-          cups: cups!,
-          datetime: datetime.toISOString(),
-          consumption_kwh: entry.consumptionKWh,
-          period: getPeriod(datetime),
-          obtained_by_real_or_max: entry.obtainMethod === 'Real',
+        const consumptionData = await getConsumption(token, {
+          cups: supply.cups,
+          distributorCode: supply.distributor_code,
+          startDate: toDatadisMonth(monthStart),
+          endDate: toDatadisMonth(monthStart),   // mismo mes en ambos extremos
+          measurementType: '0',
+          pointType: String(supply.point_type ?? 5),
+          authorizedNif: datadis_authorized_nif ?? undefined,
         })
+
+        const chunkCount = consumptionData.timeCurve?.length ?? 0
+        send('ok', `${monthLabel}: ${chunkCount} registros`)
+
+        for (const entry of consumptionData.timeCurve ?? []) {
+          const datetime = datadisDatetimeToDate(entry.date, entry.time)
+          allRows.push({
+            user_id: user.id,
+            cups: supply.cups,
+            datetime: datetime.toISOString(),
+            consumption_kwh: entry.consumptionKWh,
+            period: getPeriod(datetime),
+            obtained_by_real_or_max: entry.obtainMethod === 'Real',
+          })
+        }
       }
     }
 

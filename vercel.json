@@ -1,16 +1,11 @@
 {
   "crons": [
-    {
-      "path": "/api/cron/sync",
-      "schedule": "0 5 * * *"
-    }
+    { "path": "/api/cron/sync", "schedule": "0 5 * * *" },
+    { "path": "/api/cron/pvpc-alert", "schedule": "0 * * * *" }
   ],
   "functions": {
-    "app/api/datadis/sync/route.ts": {
-      "maxDuration": 60
-    },
-    "app/api/cron/sync/route.ts": {
-      "maxDuration": 300
-    }
+    "app/api/datadis/sync/route.ts": { "maxDuration": 60 },
+    "app/api/cron/sync/route.ts": { "maxDuration": 300 },
+    "app/api/cron/pvpc-alert/route.ts": { "maxDuration": 30 }
   }
 }

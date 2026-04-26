@@ -23,6 +23,8 @@ export interface Database {
           power_kw: number | null
           power_price_eur_kw_month: number | null
           monthly_kwh_target: number | null
+          push_subscription: Record<string, unknown> | null
+          push_price_threshold: number | null
         }
         Insert: {
           id: string
@@ -43,6 +45,8 @@ export interface Database {
           power_kw?: number | null
           power_price_eur_kw_month?: number | null
           monthly_kwh_target?: number | null
+          push_subscription?: Record<string, unknown> | null
+          push_price_threshold?: number | null
         }
         Update: {
           id?: string
@@ -63,6 +67,8 @@ export interface Database {
           power_kw?: number | null
           power_price_eur_kw_month?: number | null
           monthly_kwh_target?: number | null
+          push_subscription?: Record<string, unknown> | null
+          push_price_threshold?: number | null
         }
         Relationships: []
       }
@@ -157,6 +163,34 @@ export interface Database {
             referencedColumns: ['id']
           }
         ]
+      }
+      user_supplies: {
+        Row: {
+          id: string
+          user_id: string
+          cups: string
+          distributor_code: string
+          point_type: number
+          display_name: string | null
+          is_active: boolean
+          created_at: string
+        }
+        Insert: {
+          user_id: string
+          cups: string
+          distributor_code: string
+          point_type?: number
+          display_name?: string | null
+          is_active?: boolean
+        }
+        Update: {
+          cups?: string
+          distributor_code?: string
+          point_type?: number
+          display_name?: string | null
+          is_active?: boolean
+        }
+        Relationships: []
       }
     }
     Views: {

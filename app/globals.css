@@ -201,6 +201,11 @@
 /* ── SCROLL CONTAINER ── */
 .table-scroll { overflow-x: auto; -webkit-overflow-scrolling: touch; }
 
+/* ── CONFIG PAGE ── */
+@media (max-width: 767px) {
+  .config-cols { grid-template-columns: 1fr !important; }
+}
+
 /* ── MOBILE NAV TOUCH ── */
 .bottom-nav a {
   -webkit-tap-highlight-color: transparent;

@@ -3,14 +3,24 @@
 import { useState, useRef, useEffect } from 'react'
 import { createClient } from '@/lib/supabase/client'
 import { Loader2, CheckCircle2, AlertCircle, ShieldCheck, Eye, EyeOff, RefreshCw, Zap, Info } from 'lucide-react'
-import type { ProfileRow } from '@/lib/supabase/types-helper'
+import type { ProfileRow, UserSupplyRow } from '@/lib/supabase/types-helper'
 import type { DatadisSupply } from '@/lib/types/datadis'
 import { ColorBadge } from '@/components/dashboard/PeriodBadge'
 
 type LogEntry = { id: number; type: string; msg: string }
 
+function urlBase64ToUint8Array(base64: string): ArrayBuffer {
+  const padding = '='.repeat((4 - (base64.length % 4)) % 4)
+  const b64 = (base64 + padding).replace(/-/g, '+').replace(/_/g, '/')
+  const raw = atob(b64)
+  const arr = new Uint8Array(raw.length)
+  for (let i = 0; i < raw.length; i++) arr[i] = raw.charCodeAt(i)
+  return arr.buffer
+}
+
 interface ConfigFormProps {
   profile: ProfileRow | null
+  supplies: UserSupplyRow[]
 }
 
 const LABEL: React.CSSProperties = { fontSize: 11, color: 'var(--muted-c)', fontWeight: 500, display: 'block', marginBottom: 5 }
@@ -41,7 +51,7 @@ const SECTION_LABEL: React.CSSProperties = {
   textTransform: 'uppercase', letterSpacing: '0.1em', marginBottom: 12,
 }
 
-export function ConfigForm({ profile }: ConfigFormProps) {
+export function ConfigForm({ profile, supplies: initialSupplies }: ConfigFormProps) {
   const supabase = createClient()
 
   const [datadisUsername, setDatadisUsername] = useState(profile?.datadis_username ?? '')
@@ -58,6 +68,12 @@ export function ConfigForm({ profile }: ConfigFormProps) {
   const [powerKw, setPowerKw] = useState(profile?.power_kw?.toString() ?? '')
   const [powerPriceKwMonth, setPowerPriceKwMonth] = useState(profile?.power_price_eur_kw_month?.toString() ?? '')
   const [monthlyTarget, setMonthlyTarget] = useState(profile?.monthly_kwh_target?.toString() ?? '')
+
+  const [localSupplies, setLocalSupplies] = useState<UserSupplyRow[]>(initialSupplies)
+  const [pushThreshold, setPushThreshold] = useState(profile?.push_price_threshold?.toString() ?? '')
+  const [pushEnabled, setPushEnabled] = useState(!!profile?.push_subscription)
+  const [pushLoading, setPushLoading] = useState(false)
+  const [pushMsg, setPushMsg] = useState<{ ok: boolean; text: string } | null>(null)
 
   const [saving, setSaving] = useState(false)
   const [testing, setTesting] = useState(false)
@@ -180,6 +196,77 @@ export function ConfigForm({ profile }: ConfigFormProps) {
     }
   }
 
+  async function handleAddSupply(cups: string, distributorCode: string) {
+    const newSupply: UserSupplyRow = {
+      id: crypto.randomUUID(), user_id: profile?.id ?? '',
+      cups, distributor_code: distributorCode, point_type: 5,
+      display_name: null, is_active: true, created_at: new Date().toISOString(),
+    }
+    const { error } = await (supabase as any)
+      .from('user_supplies')
+      .upsert({ user_id: profile?.id, cups, distributor_code: distributorCode, point_type: 5 }, { onConflict: 'user_id,cups' })
+    if (!error) {
+      setLocalSupplies(prev => prev.find(s => s.cups === cups) ? prev : [...prev, newSupply])
+    }
+  }
+
+  async function handleToggleSupply(id: string, isActive: boolean) {
+    await (supabase as any).from('user_supplies').update({ is_active: isActive }).eq('id', id)
+    setLocalSupplies(prev => prev.map(s => s.id === id ? { ...s, is_active: isActive } : s))
+  }
+
+  async function handleDeleteSupply(id: string) {
+    await (supabase as any).from('user_supplies').delete().eq('id', id)
+    setLocalSupplies(prev => prev.filter(s => s.id !== id))
+  }
+
+  async function handlePushToggle() {
+    setPushLoading(true)
+    setPushMsg(null)
+    try {
+      if (pushEnabled) {
+        await fetch('/api/push', { method: 'DELETE' })
+        setPushEnabled(false)
+        setPushMsg({ ok: true, text: 'Notificaciones desactivadas' })
+      } else {
+        if (!('Notification' in window)) {
+          setPushMsg({ ok: false, text: 'Este navegador no soporta notificaciones' })
+          return
+        }
+        const permission = await Notification.requestPermission()
+        if (permission !== 'granted') {
+          setPushMsg({ ok: false, text: 'Permiso denegado por el navegador' })
+          return
+        }
+        const reg = await navigator.serviceWorker.register('/sw.js')
+        await navigator.serviceWorker.ready
+        const { publicKey } = await fetch('/api/push').then(r => r.json()) as { publicKey: string }
+        if (!publicKey) {
+          setPushMsg({ ok: false, text: 'VAPID keys no configuradas en el servidor' })
+          return
+        }
+        const subscription = await reg.pushManager.subscribe({
+          userVisibleOnly: true,
+          applicationServerKey: urlBase64ToUint8Array(publicKey),
+        })
+        await fetch('/api/push', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            subscription: subscription.toJSON(),
+            threshold: parseFloat(pushThreshold) || undefined,
+          }),
+        })
+        setPushEnabled(true)
+        setPushMsg({ ok: true, text: 'Notificaciones activadas en este dispositivo' })
+      }
+    } catch (err) {
+      setPushMsg({ ok: false, text: err instanceof Error ? err.message : 'Error desconocido' })
+    } finally {
+      setPushLoading(false)
+    }
+  }
+
   // Auto-scroll log box to bottom on new entries
   useEffect(() => {
     if (logBoxRef.current) {
@@ -192,7 +279,9 @@ export function ConfigForm({ profile }: ConfigFormProps) {
     : null
 
   return (
-    <div className="g2" style={{ gap: 14 }}>
+    <div style={{ display: 'grid', gridTemplateColumns: 'minmax(0,1.4fr) minmax(0,1fr)', gap: 16, alignItems: 'start' }}
+      className="config-cols">
+
       {/* LEFT: form */}
       <form onSubmit={handleSave} style={{ display: 'flex', flexDirection: 'column', gap: 12 }}>
         <div style={CARD}>
@@ -275,16 +364,31 @@ export function ConfigForm({ profile }: ConfigFormProps) {
                 {testResult.ok ? (
                   <div>
                     <div style={{ marginBottom: 6 }}>✓ Conexión OK · {testResult.supplies?.length ?? 0} suministro(s)</div>
-                    {testResult.supplies?.map(s => (
-                      <div key={s.cups} style={{ fontSize: 11, padding: '8px', background: 'var(--bg-inset)', borderRadius: 6, marginTop: 6 }}>
-                        <div style={{ fontFamily: 'var(--font-mono)', marginBottom: 4 }}>{s.cups}</div>
-                        <div style={{ color: 'var(--muted-c)', marginBottom: 4 }}>{s.address}</div>
-                        <div style={{ display: 'flex', gap: 6 }}>
-                          <ColorBadge color="#38bdf8">Dist. {s.distributorCode}</ColorBadge>
-                          <ColorBadge color="#fbbf24">Tipo {s.pointType}</ColorBadge>
+                    {testResult.supplies?.map(s => {
+                      const already = localSupplies.some(ls => ls.cups === s.cups)
+                      return (
+                        <div key={s.cups} style={{ fontSize: 11, padding: '8px', background: 'var(--bg-inset)', borderRadius: 6, marginTop: 6 }}>
+                          <div style={{ fontFamily: 'var(--font-mono)', marginBottom: 4 }}>{s.cups}</div>
+                          <div style={{ color: 'var(--muted-c)', marginBottom: 6 }}>{s.address}</div>
+                          <div style={{ display: 'flex', gap: 6, alignItems: 'center', flexWrap: 'wrap' }}>
+                            <ColorBadge color="#38bdf8">Dist. {s.distributorCode}</ColorBadge>
+                            <ColorBadge color="#fbbf24">Tipo {s.pointType}</ColorBadge>
+                            {already
+                              ? <ColorBadge color="#34d399">✓ Añadido</ColorBadge>
+                              : (
+                                <button type="button" onClick={() => handleAddSupply(s.cups, s.distributorCode)} style={{
+                                  padding: '2px 8px', borderRadius: 5, cursor: 'pointer', fontSize: 10, fontWeight: 500,
+                                  background: 'rgba(245,158,11,0.12)', color: 'var(--nav-active-text)',
+                                  border: '1px solid rgba(245,158,11,0.25)', fontFamily: 'var(--font-sans)',
+                                }}>
+                                  + Añadir suministro
+                                </button>
+                              )
+                            }
+                          </div>
                         </div>
-                      </div>
-                    ))}
+                      )
+                    })}
                   </div>
                 ) : (
                   <span>✗ {testResult.error}</span>
@@ -439,23 +543,85 @@ export function ConfigForm({ profile }: ConfigFormProps) {
 
         </div>
 
-        {profile?.cups && (
+        {localSupplies.length > 0 && (
           <div style={CARD}>
-            <div style={SECTION_LABEL}>Suministros detectados</div>
-            <div style={{ padding: '12px', background: 'var(--bg-inset)', borderRadius: 8, border: '1px solid var(--border-subtle)' }}>
-              <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 8 }}>
-                <div style={{ width: 6, height: 6, borderRadius: '50%', background: '#34d399', boxShadow: '0 0 6px #34d39960' }} />
-                <span style={{ fontSize: 12.5, color: 'var(--text-2)', fontWeight: 500 }}>Suministro principal</span>
-              </div>
-              <div style={{ fontSize: 10.5, color: 'var(--dim)', fontFamily: 'var(--font-mono)', wordBreak: 'break-all', marginBottom: 8 }}>
-                {profile.cups}
-              </div>
-              <div style={{ display: 'flex', gap: 6 }}>
-                {profile.distributor_code && <ColorBadge color="#38bdf8">Dist. {profile.distributor_code}</ColorBadge>}
-              </div>
+            <div style={SECTION_LABEL}>Suministros activos</div>
+            <div style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
+              {localSupplies.map(s => (
+                <div key={s.id} style={{
+                  display: 'flex', alignItems: 'center', gap: 8, padding: '8px 10px',
+                  background: 'var(--bg-inset)', borderRadius: 8, border: '1px solid var(--border-subtle)',
+                }}>
+                  <div style={{ width: 7, height: 7, borderRadius: '50%', flexShrink: 0, background: s.is_active ? '#34d399' : 'var(--dim)', boxShadow: s.is_active ? '0 0 6px #34d39960' : 'none' }} />
+                  <div style={{ flex: 1, minWidth: 0 }}>
+                    <div style={{ fontSize: 10.5, fontFamily: 'var(--font-mono)', color: 'var(--text-2)', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+                      {s.cups}
+                    </div>
+                    {s.display_name && <div style={{ fontSize: 10, color: 'var(--dim)', marginTop: 1 }}>{s.display_name}</div>}
+                  </div>
+                  {s.distributor_code && <ColorBadge color="#38bdf8">Dist. {s.distributor_code}</ColorBadge>}
+                  <button type="button" onClick={() => handleToggleSupply(s.id, !s.is_active)} style={{
+                    padding: '2px 8px', borderRadius: 5, cursor: 'pointer', fontSize: 10, fontWeight: 500,
+                    background: s.is_active ? 'rgba(52,211,153,0.1)' : 'var(--btn-bg)',
+                    color: s.is_active ? '#34d399' : 'var(--dim)',
+                    border: `1px solid ${s.is_active ? 'rgba(52,211,153,0.25)' : 'var(--btn-border)'}`,
+                    fontFamily: 'var(--font-sans)',
+                  }}>
+                    {s.is_active ? 'Activo' : 'Inactivo'}
+                  </button>
+                  <button type="button" onClick={() => handleDeleteSupply(s.id)} style={{
+                    background: 'none', border: 'none', cursor: 'pointer', color: 'var(--dim)', fontSize: 14, lineHeight: 1, padding: '2px 4px', flexShrink: 0,
+                  }} title="Eliminar suministro">
+                    ×
+                  </button>
+                </div>
+              ))}
             </div>
           </div>
         )}
+
+        <div style={CARD}>
+          <div style={SECTION_LABEL}>Notificaciones de precio</div>
+          <div style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
+            <div>
+              <label style={LABEL}>Umbral PVPC (€/kWh)</label>
+              <input
+                style={{ ...INPUT, fontFamily: 'var(--font-mono)', maxWidth: 160 }}
+                value={pushThreshold}
+                onChange={e => setPushThreshold(e.target.value)}
+                placeholder="0.08000"
+                type="number"
+                step="0.001"
+                min="0"
+              />
+              <div style={{ fontSize: 10.5, color: 'var(--dim2)', marginTop: 4 }}>
+                Notificación cuando el precio baje de este valor.
+              </div>
+            </div>
+            <div style={{ display: 'flex', alignItems: 'center', gap: 10, flexWrap: 'wrap' }}>
+              <button
+                type="button"
+                style={pushEnabled ? BTN_DEFAULT : BTN_PRIMARY}
+                onClick={handlePushToggle}
+                disabled={pushLoading}
+              >
+                {pushLoading && <Loader2 size={12} className="spin" />}
+                {pushEnabled ? 'Desactivar notificaciones' : 'Activar notificaciones'}
+              </button>
+              {pushMsg && (
+                <span style={{ fontSize: 12, color: pushMsg.ok ? '#34d399' : '#f87171', display: 'flex', alignItems: 'center', gap: 4 }}>
+                  {pushMsg.ok ? <CheckCircle2 size={12} /> : <AlertCircle size={12} />}
+                  {pushMsg.text}
+                </span>
+              )}
+            </div>
+            {pushEnabled && !pushMsg && (
+              <div style={{ fontSize: 11, color: '#34d399', display: 'flex', alignItems: 'center', gap: 4 }}>
+                <span>✓</span> Activo en este dispositivo
+              </div>
+            )}
+          </div>
+        </div>
 
         <div style={{ padding: '12px 14px', borderRadius: 10, background: 'var(--status-bg)', border: '1px solid var(--status-border)', display: 'flex', gap: 8, alignItems: 'flex-start' }}>
           <Info size={13} color="var(--dim)" style={{ flexShrink: 0, marginTop: 1 }} />
