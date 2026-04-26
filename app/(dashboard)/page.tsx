@@ -62,7 +62,7 @@ export default async function HomePage() {
   return (
     <div style={{ display: 'flex', flexDirection: 'column', gap: 12 }}>
       {/* Stat cards */}
-      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(4, 1fr)', gap: 12 }}>
+      <div className="g4">
         {/* Consumo */}
         <StatCard
           label="Consumo mes"

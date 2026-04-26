@@ -3,6 +3,7 @@
 import { usePathname } from 'next/navigation'
 import { Sidebar } from './Sidebar'
 import { Topbar } from './Topbar'
+import { BottomNav } from './BottomNav'
 
 interface DashboardShellProps {
   children: React.ReactNode
@@ -13,16 +14,19 @@ export function DashboardShell({ children, lastSyncAt }: DashboardShellProps) {
   const pathname = usePathname()
 
   return (
-    <div style={{ display: 'flex', height: '100vh', background: 'var(--bg0)' }}>
-      <Sidebar lastSyncAt={lastSyncAt} />
-      <div style={{ flex: 1, display: 'flex', flexDirection: 'column', overflow: 'hidden' }}>
+    <div style={{ display: 'flex', height: '100svh', background: 'var(--bg0)' }}>
+      <div className="sidebar-wrap">
+        <Sidebar lastSyncAt={lastSyncAt} />
+      </div>
+      <div style={{ flex: 1, display: 'flex', flexDirection: 'column', overflow: 'hidden', minWidth: 0 }}>
         <Topbar pathname={pathname} />
-        <main style={{ flex: 1, overflow: 'auto', padding: '20px 24px', background: 'var(--bg0)' }}>
+        <main className="main-content" style={{ background: 'var(--bg0)' }}>
           <div className="page-enter">
             {children}
           </div>
         </main>
       </div>
+      <BottomNav />
     </div>
   )
 }

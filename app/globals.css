@@ -131,9 +131,11 @@
     font-feature-settings: "rlig" 1, "calt" 1;
     transition: background 0.25s ease, color 0.25s ease;
     overflow: hidden;
-    height: 100%;
+    height: 100vh;
+    height: 100svh;
   }
-  html, #__next { height: 100%; }
+  html { height: 100%; }
+  #__next { height: 100%; }
 }
 
 /* Scrollbar */
@@ -152,3 +154,49 @@
 .page-enter { animation: fadeUp 0.3s ease both; }
 .spin { animation: spin 1s linear infinite; }
 .pulse { animation: pulse 1.5s ease-in-out infinite; }
+
+/* ── RESPONSIVE GRID UTILITIES ── */
+.g4 { display: grid; grid-template-columns: repeat(4, 1fr); gap: 12px; }
+.g3 { display: grid; grid-template-columns: repeat(3, 1fr); gap: 12px; }
+.g2 { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; }
+
+@media (max-width: 767px) {
+  .g4 { grid-template-columns: repeat(2, 1fr); }
+  .g3 { grid-template-columns: 1fr; }
+  .g2 { grid-template-columns: 1fr; }
+}
+@media (min-width: 768px) and (max-width: 1023px) {
+  .g4 { grid-template-columns: repeat(2, 1fr); }
+}
+
+/* ── LAYOUT UTILITIES ── */
+.sidebar-wrap { display: flex; flex-shrink: 0; }
+.bottom-nav {
+  display: none;
+  position: fixed; bottom: 0; left: 0; right: 0;
+  height: 58px;
+  background: var(--bg1);
+  border-top: 1px solid var(--sidebar-border);
+  backdrop-filter: blur(20px);
+  -webkit-backdrop-filter: blur(20px);
+  z-index: 50;
+  justify-content: space-around;
+  align-items: center;
+  padding: 0 4px;
+}
+.main-content {
+  padding: 20px 24px;
+  flex: 1;
+  overflow: auto;
+}
+.topbar-date { display: flex; }
+
+@media (max-width: 767px) {
+  .sidebar-wrap { display: none; }
+  .bottom-nav { display: flex; }
+  .main-content { padding: 14px 14px 74px; }
+  .topbar-date { display: none; }
+}
+
+/* ── SCROLL CONTAINER ── */
+.table-scroll { overflow-x: auto; -webkit-overflow-scrolling: touch; }

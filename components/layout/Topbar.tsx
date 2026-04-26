@@ -35,35 +35,35 @@ export function Topbar({ pathname }: TopbarProps) {
   return (
     <div style={{
       display: 'flex', alignItems: 'center', justifyContent: 'space-between',
-      padding: '0 24px', height: 48,
+      padding: '0 16px', height: 48,
       background: 'var(--topbar-bg)',
       backdropFilter: 'blur(10px)',
       borderBottom: '1px solid var(--sidebar-border)',
-      flexShrink: 0,
+      flexShrink: 0, gap: 8,
     }}>
-      <div style={{ display: 'flex', alignItems: 'baseline', gap: 10 }}>
-        <span style={{ fontSize: 16, fontWeight: 600, color: 'var(--text)' }}>{meta.title}</span>
-        <span style={{ fontSize: 12, color: 'var(--dim)' }}>{meta.sub}</span>
+      <div style={{ display: 'flex', alignItems: 'baseline', gap: 8, minWidth: 0 }}>
+        <span style={{ fontSize: 15, fontWeight: 600, color: 'var(--text)', whiteSpace: 'nowrap' }}>{meta.title}</span>
+        <span className="topbar-date" style={{ fontSize: 12, color: 'var(--dim)', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{meta.sub}</span>
       </div>
-      <div style={{ display: 'flex', gap: 8, alignItems: 'center' }}>
-        <span style={{ fontSize: 11.5, color: 'var(--dim)', display: 'flex', alignItems: 'center', gap: 5 }}>
+      <div style={{ display: 'flex', gap: 6, alignItems: 'center', flexShrink: 0 }}>
+        <span className="topbar-date" style={{ fontSize: 11, color: 'var(--dim)', whiteSpace: 'nowrap' }}>
           {now}
         </span>
         <button
           onClick={handleSync}
           disabled={syncing}
           style={{
-            display: 'inline-flex', alignItems: 'center', gap: 6,
+            display: 'inline-flex', alignItems: 'center', gap: 5,
             padding: '5px 10px', borderRadius: 8,
             background: 'var(--btn-bg)', color: 'var(--btn-text)',
             border: '1px solid var(--btn-border)',
             fontSize: 11.5, fontWeight: 500, cursor: 'pointer',
             fontFamily: 'var(--font-sans)',
-            transition: 'all 0.15s',
+            transition: 'all 0.15s', whiteSpace: 'nowrap',
           }}
         >
           <RefreshCw size={11} className={syncing ? 'spin' : ''} />
-          {syncing ? 'Sincronizando...' : 'Sincronizar'}
+          <span className="topbar-date">{syncing ? 'Sincronizando...' : 'Sincronizar'}</span>
         </button>
         <ThemeToggle />
         <SignOutButton />

@@ -100,7 +100,7 @@ export function PvpcView({ data, avgPricePaid, avgMarketPrice }: Props) {
       </div>
 
       {/* Metrics */}
-      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(4, 1fr)', gap: 12 }}>
+      <div className="g4">
         {[
           { label: 'Precio mercado medio', val: avgMarketPrice != null ? avgMarketPrice.toFixed(5) + ' €/kWh' : '—', color: '#a78bfa' },
           { label: 'Precio ponderado pagado', val: avgPricePaid != null ? avgPricePaid.toFixed(5) + ' €/kWh' : '—', color: '#38bdf8' },
@@ -115,7 +115,7 @@ export function PvpcView({ data, avgPricePaid, avgMarketPrice }: Props) {
       </div>
 
       {/* Cheap / expensive hours */}
-      <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 12 }}>
+      <div className="g2">
         <div style={{ ...CARD, borderColor: 'rgba(52,211,153,0.25)' }}>
           <div style={{ fontSize: 11, fontWeight: 600, color: '#34d399', marginBottom: 8 }}>✓ Mejores horas para consumir</div>
           <div style={{ display: 'flex', gap: 6, flexWrap: 'wrap', marginBottom: 10 }}>

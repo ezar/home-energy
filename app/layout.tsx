@@ -1,7 +1,8 @@
-import type { Metadata } from 'next'
+import type { Metadata, Viewport } from 'next'
 import { Space_Grotesk, JetBrains_Mono } from 'next/font/google'
 import { Analytics } from '@vercel/analytics/next'
 import { ThemeProvider } from '@/components/providers/ThemeProvider'
+import { SwRegister } from '@/components/providers/SwRegister'
 import './globals.css'
 
 const spaceGrotesk = Space_Grotesk({
@@ -18,7 +19,21 @@ const jetbrainsMono = JetBrains_Mono({
 
 export const metadata: Metadata = {
   title: 'Energy Dashboard',
-  description: 'Dashboard de consumo eléctrico',
+  description: 'Monitor de consumo eléctrico doméstico',
+  manifest: '/manifest.webmanifest',
+  appleWebApp: {
+    capable: true,
+    statusBarStyle: 'black-translucent',
+    title: 'Energy',
+  },
+}
+
+export const viewport: Viewport = {
+  width: 'device-width',
+  initialScale: 1,
+  maximumScale: 1,
+  userScalable: false,
+  themeColor: '#111114',
 }
 
 export default function RootLayout({ children }: { children: React.ReactNode }) {
@@ -28,6 +43,7 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
         <ThemeProvider>
           {children}
         </ThemeProvider>
+        <SwRegister />
         <Analytics />
       </body>
     </html>

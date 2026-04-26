@@ -136,7 +136,7 @@ export function ConfigForm({ profile }: ConfigFormProps) {
     : null
 
   return (
-    <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 14 }}>
+    <div className="g2" style={{ gap: 14 }}>
       {/* LEFT: form */}
       <form onSubmit={handleSave} style={{ display: 'flex', flexDirection: 'column', gap: 12 }}>
         <div style={CARD}>
@@ -155,7 +155,7 @@ export function ConfigForm({ profile }: ConfigFormProps) {
             </div>
           </div>
           <div style={{ display: 'flex', flexDirection: 'column', gap: 12 }}>
-            <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 10 }}>
+            <div className="g2" style={{ gap: 10 }}>
               <div>
                 <label style={LABEL}>NIF / Usuario</label>
                 <input style={INPUT} value={datadisUsername} onChange={e => setDatadisUsername(e.target.value)} placeholder="12345678A" autoComplete="off" />
@@ -191,7 +191,7 @@ export function ConfigForm({ profile }: ConfigFormProps) {
         <div style={CARD}>
           <div style={SECTION_LABEL}>Suministro</div>
           <div style={{ display: 'flex', flexDirection: 'column', gap: 12 }}>
-            <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 10 }}>
+            <div className="g2" style={{ gap: 10 }}>
               <div>
                 <label style={LABEL}>CUPS</label>
                 <input style={{ ...INPUT, fontFamily: 'var(--font-mono)', fontSize: 11 }} value={cups} onChange={e => setCups(e.target.value)} placeholder="ES0021000XXXXXXXXX" autoComplete="off" />

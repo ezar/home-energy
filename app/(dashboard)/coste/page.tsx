@@ -87,7 +87,7 @@ export default async function CostePage() {
   return (
     <div style={{ display: 'flex', flexDirection: 'column', gap: 12 }}>
       {/* Top stats */}
-      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: 12 }}>
+      <div className="g3">
         {[
           { label: 'Coste total mes', val: current.totalCost.toFixed(2), unit: '€', color: 'var(--text)' },
           { label: 'kWh consumidos', val: current.totalKwh.toFixed(1), unit: 'kWh', color: '#38bdf8' },
@@ -107,7 +107,7 @@ export default async function CostePage() {
         <div style={{ fontSize: 10.5, fontWeight: 600, color: 'var(--dim)', textTransform: 'uppercase', letterSpacing: '0.1em', marginBottom: 12 }}>
           Desglose por período
         </div>
-        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: 10 }}>
+        <div className="g3" style={{ gap: 10 }}>
           {byPeriod.map(({ period, kwh, cost }) => {
             const color = PERIOD_COLORS[period]
             const pct = current.totalKwh > 0 ? Math.round(kwh / current.totalKwh * 100) : 0
@@ -139,7 +139,7 @@ export default async function CostePage() {
       </div>
 
       {/* Chart + history */}
-      <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 12 }}>
+      <div className="g2">
         <div style={CARD}>
           <div style={{ fontSize: 10.5, fontWeight: 600, color: 'var(--dim)', textTransform: 'uppercase', letterSpacing: '0.1em', marginBottom: 12 }}>
             Coste acumulado · {current.label}
