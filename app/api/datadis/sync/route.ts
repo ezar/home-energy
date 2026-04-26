@@ -4,11 +4,11 @@
 
 import { NextResponse } from 'next/server'
 import { createClient, createServiceClient } from '@/lib/supabase/server'
-import { getToken, getConsumption, getMaxPower, datadisDatetimeToDate } from '@/lib/datadis'
+import { getToken, getConsumption, datadisDatetimeToDate } from '@/lib/datadis'
 import { getPeriod } from '@/lib/tariff'
 import type { SyncResult } from '@/lib/types/consumption'
-import type { ProfileRow, ConsumptionInsert, MaximeterInsert } from '@/lib/supabase/types-helper'
-import { format, subMonths, startOfMonth } from 'date-fns'
+import type { ProfileRow, ConsumptionInsert } from '@/lib/supabase/types-helper'
+import { format, subMonths, subDays, startOfMonth, parseISO } from 'date-fns'
 
 export const dynamic = 'force-dynamic'
 export const maxDuration = 60
@@ -28,11 +28,11 @@ export async function POST() {
   const serviceClient = await createServiceClient()
   const { data: profileRaw } = await serviceClient
     .from('profiles')
-    .select('datadis_username, datadis_password_encrypted, cups, distributor_code, point_type, datadis_authorized_nif')
+    .select('datadis_username, datadis_password_encrypted, cups, distributor_code, point_type, datadis_authorized_nif, last_sync_at')
     .eq('id', user.id)
     .single()
 
-  const profile = profileRaw as Pick<ProfileRow, 'datadis_username' | 'datadis_password_encrypted' | 'cups' | 'distributor_code' | 'point_type' | 'datadis_authorized_nif'> | null
+  const profile = profileRaw as Pick<ProfileRow, 'datadis_username' | 'datadis_password_encrypted' | 'cups' | 'distributor_code' | 'point_type' | 'datadis_authorized_nif' | 'last_sync_at'> | null
 
   if (!profile) return NextResponse.json({ error: 'Perfil no encontrado' }, { status: 404 })
   if (!profile.datadis_username || !profile.datadis_password_encrypted) return NextResponse.json({ error: 'Credenciales Datadis no configuradas' }, { status: 400 })
@@ -46,7 +46,11 @@ export async function POST() {
   }
 
   const now = new Date()
-  const startDate = startOfMonth(subMonths(now, 2))
+  // Si ya hay un sync previo, pedir solo desde (last_sync_at - 5 días)
+  // para cubrir el retraso de Datadis (~2 días). Si es el primer sync, 2 meses.
+  const startDate = profile.last_sync_at
+    ? subDays(parseISO(profile.last_sync_at), 5)
+    : startOfMonth(subMonths(now, 2))
 
   try {
     const consumptionData = await getConsumption(token, {
@@ -87,34 +91,6 @@ export async function POST() {
       .from('profiles')
       .update({ last_sync_at: new Date().toISOString() })
       .eq('id', user.id)
-
-    // Maxímetro (best-effort)
-    try {
-      const maxPowerData = await getMaxPower(token, {
-        cups: profile.cups,
-        distributorCode: profile.distributor_code,
-        startDate: toDatadisMonth(startDate),
-        endDate: toDatadisMonth(now),
-        authorizedNif: profile.datadis_authorized_nif ?? undefined,
-      })
-
-      if (maxPowerData.maxPower?.length) {
-        const maxRows: MaximeterInsert[] = maxPowerData.maxPower.map((entry) => {
-          const datetime = datadisDatetimeToDate(entry.date, entry.time)
-          return {
-            user_id: user.id,
-            cups: profile.cups!,
-            datetime: datetime.toISOString(),
-            max_power_kw: entry.maxPower / 1000,
-            period: getPeriod(datetime),
-          }
-        })
-        
-        await (serviceClient as any)
-          .from('maximeter')
-          .upsert(maxRows, { onConflict: 'user_id,cups,datetime' })
-      }
-    } catch { /* maxímetro es opcional */ }
 
     const result: SyncResult = {
       synced: consumptionSynced,
