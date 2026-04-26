@@ -1,11 +1,13 @@
 'use client'
 
-import { useState } from 'react'
+import { useState, useRef, useEffect } from 'react'
 import { createClient } from '@/lib/supabase/client'
 import { Loader2, CheckCircle2, AlertCircle, ShieldCheck, Eye, EyeOff, RefreshCw, Zap, Info } from 'lucide-react'
 import type { ProfileRow } from '@/lib/supabase/types-helper'
 import type { DatadisSupply } from '@/lib/types/datadis'
 import { ColorBadge } from '@/components/dashboard/PeriodBadge'
+
+type LogEntry = { id: number; type: string; msg: string }
 
 interface ConfigFormProps {
   profile: ProfileRow | null
@@ -56,8 +58,10 @@ export function ConfigForm({ profile }: ConfigFormProps) {
   const [syncingPvpc, setSyncingPvpc] = useState(false)
   const [saveMsg, setSaveMsg] = useState<{ ok: boolean; text: string } | null>(null)
   const [testResult, setTestResult] = useState<{ ok: boolean; supplies?: DatadisSupply[]; error?: string } | null>(null)
-  const [syncDatadisMsg, setSyncDatadisMsg] = useState<{ ok: boolean; text: string } | null>(null)
+  const [syncLogs, setSyncLogs] = useState<LogEntry[]>([])
   const [syncPvpcMsg, setSyncPvpcMsg] = useState<{ ok: boolean; text: string } | null>(null)
+  const logIdRef = useRef(0)
+  const logBoxRef = useRef<HTMLDivElement>(null)
 
   async function handleSave(e: React.FormEvent) {
     e.preventDefault()
@@ -101,15 +105,31 @@ export function ConfigForm({ profile }: ConfigFormProps) {
 
   async function handleSyncDatadis() {
     setSyncingDatadis(true)
-    setSyncDatadisMsg(null)
+    setSyncLogs([])
     try {
       const res = await fetch('/api/datadis/sync', { method: 'POST' })
-      const data = await res.json()
-      setSyncDatadisMsg(res.ok
-        ? { ok: true, text: `${data.synced} registros sincronizados` }
-        : { ok: false, text: data.error ?? 'Error al sincronizar' })
+      if (!res.body) throw new Error('Sin respuesta del servidor')
+
+      const reader = res.body.getReader()
+      const decoder = new TextDecoder()
+      let buffer = ''
+
+      while (true) {
+        const { done, value } = await reader.read()
+        if (done) break
+        buffer += decoder.decode(value, { stream: true })
+        const lines = buffer.split('\n')
+        buffer = lines.pop() ?? ''
+        for (const line of lines) {
+          if (!line.startsWith('data: ')) continue
+          try {
+            const event = JSON.parse(line.slice(6)) as { type: string; msg: string }
+            setSyncLogs(prev => [...prev, { id: ++logIdRef.current, ...event }])
+          } catch { /* ignore malformed */ }
+        }
+      }
     } catch {
-      setSyncDatadisMsg({ ok: false, text: 'Error de red' })
+      setSyncLogs(prev => [...prev, { id: ++logIdRef.current, type: 'error', msg: 'Error de red' }])
     } finally {
       setSyncingDatadis(false)
     }
@@ -130,6 +150,13 @@ export function ConfigForm({ profile }: ConfigFormProps) {
       setSyncingPvpc(false)
     }
   }
+
+  // Auto-scroll log box to bottom on new entries
+  useEffect(() => {
+    if (logBoxRef.current) {
+      logBoxRef.current.scrollTop = logBoxRef.current.scrollHeight
+    }
+  }, [syncLogs])
 
   const lastSync = profile?.last_sync_at
     ? new Date(profile.last_sync_at).toLocaleString('es-ES', { day: 'numeric', month: 'short', year: 'numeric', hour: '2-digit', minute: '2-digit' })
@@ -270,18 +297,50 @@ export function ConfigForm({ profile }: ConfigFormProps) {
           <div style={{ display: 'flex', gap: 8, marginTop: 14, flexWrap: 'wrap' }}>
             <button style={BTN_DEFAULT} onClick={handleSyncDatadis} disabled={syncingDatadis} type="button">
               {syncingDatadis ? <Loader2 size={11} className="spin" /> : <RefreshCw size={11} />}
-              {syncingDatadis ? 'Recargando...' : 'Recargar Datadis'}
+              {syncingDatadis ? 'Sincronizando...' : 'Recargar Datadis'}
             </button>
             <button style={BTN_DEFAULT} onClick={handleSyncPvpc} disabled={syncingPvpc} type="button">
               {syncingPvpc ? <Loader2 size={11} className="spin" /> : <Zap size={11} />}
               {syncingPvpc ? 'Recargando...' : 'Recargar PVPC'}
             </button>
           </div>
-          {syncDatadisMsg && (
-            <p style={{ fontSize: 11, marginTop: 8, color: syncDatadisMsg.ok ? '#34d399' : '#f87171', display: 'flex', alignItems: 'center', gap: 4 }}>
-              {syncDatadisMsg.ok ? <CheckCircle2 size={11} /> : <AlertCircle size={11} />} {syncDatadisMsg.text}
-            </p>
+
+          {/* Log en tiempo real */}
+          {syncLogs.length > 0 && (
+            <div
+              ref={logBoxRef}
+              style={{
+                marginTop: 10, padding: '8px 10px',
+                background: 'var(--bg-inset)',
+                border: '1px solid var(--border-subtle)',
+                borderRadius: 8, maxHeight: 180, overflowY: 'auto',
+                fontFamily: 'var(--font-mono)', fontSize: 11,
+                display: 'flex', flexDirection: 'column', gap: 2,
+              }}
+            >
+              {syncLogs.map(log => (
+                <div key={log.id} style={{
+                  display: 'flex', gap: 7, alignItems: 'flex-start',
+                  color: log.type === 'error' ? '#f87171'
+                       : log.type === 'warn'  ? '#fbbf24'
+                       : log.type === 'ok' || log.type === 'done' ? '#34d399'
+                       : 'var(--muted-c)',
+                }}>
+                  <span style={{ flexShrink: 0, opacity: 0.7 }}>
+                    {log.type === 'error' ? '✗' : log.type === 'warn' ? '⚠' : log.type === 'ok' || log.type === 'done' ? '✓' : '·'}
+                  </span>
+                  <span style={{ lineHeight: 1.5 }}>{log.msg}</span>
+                </div>
+              ))}
+              {syncingDatadis && (
+                <div style={{ color: 'var(--dim)', display: 'flex', gap: 7 }}>
+                  <Loader2 size={10} className="spin" style={{ flexShrink: 0, marginTop: 2 }} />
+                  <span>Esperando respuesta...</span>
+                </div>
+              )}
+            </div>
           )}
+
           {syncPvpcMsg && (
             <p style={{ fontSize: 11, marginTop: 4, color: syncPvpcMsg.ok ? '#34d399' : '#f87171', display: 'flex', alignItems: 'center', gap: 4 }}>
               {syncPvpcMsg.ok ? <CheckCircle2 size={11} /> : <AlertCircle size={11} />} {syncPvpcMsg.text}
@@ -310,7 +369,7 @@ export function ConfigForm({ profile }: ConfigFormProps) {
         <div style={{ padding: '12px 14px', borderRadius: 10, background: 'var(--status-bg)', border: '1px solid var(--status-border)', display: 'flex', gap: 8, alignItems: 'flex-start' }}>
           <Info size={13} color="var(--dim)" style={{ flexShrink: 0, marginTop: 1 }} />
           <p style={{ fontSize: 11, color: 'var(--dim2)', lineHeight: 1.65, margin: 0 }}>
-            Datadis puede tener hasta <strong style={{ color: 'var(--muted-c)' }}>2 días de retraso</strong>. El cron automático se ejecuta a las <strong style={{ color: 'var(--muted-c)' }}>05:00</strong> y sincroniza los últimos 3 días.
+            Datadis puede tener hasta <strong style={{ color: 'var(--muted-c)' }}>2 días de retraso</strong> y limita a <strong style={{ color: 'var(--muted-c)' }}>~1 petición/día</strong> por endpoint. Si ves error 429, espera 24h. El cron automático se ejecuta a las <strong style={{ color: 'var(--muted-c)' }}>05:00</strong>.
           </p>
         </div>
       </div>

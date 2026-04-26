@@ -1,28 +1,58 @@
 // POST /api/datadis/sync
-// Sincroniza consumo Datadis para el usuario autenticado.
+// Emite Server-Sent Events con el progreso paso a paso.
 // Siempre server-side — las credenciales nunca llegan al cliente.
 
-import { NextResponse } from 'next/server'
 import { createClient, createServiceClient } from '@/lib/supabase/server'
 import { getToken, getConsumption, datadisDatetimeToDate } from '@/lib/datadis'
 import { getPeriod } from '@/lib/tariff'
-import type { SyncResult } from '@/lib/types/consumption'
 import type { ProfileRow, ConsumptionInsert } from '@/lib/supabase/types-helper'
 import { format, subMonths, subDays, startOfMonth, parseISO } from 'date-fns'
+import { es } from 'date-fns/locale'
 
 export const dynamic = 'force-dynamic'
 export const maxDuration = 60
+
+const SSE_HEADERS = {
+  'Content-Type': 'text/event-stream',
+  'Cache-Control': 'no-cache, no-transform',
+  'Connection': 'keep-alive',
+  'X-Accel-Buffering': 'no',
+}
+
+type LogType = 'info' | 'ok' | 'warn' | 'error' | 'done'
 
 function toDatadisMonth(date: Date): string {
   return format(date, 'yyyy/MM')
 }
 
+function makeStream(run: (send: (type: LogType, msg: string) => void) => Promise<void>): Response {
+  const encoder = new TextEncoder()
+  const stream = new ReadableStream({
+    async start(controller) {
+      const send = (type: LogType, msg: string) => {
+        controller.enqueue(encoder.encode(`data: ${JSON.stringify({ type, msg })}\n\n`))
+      }
+      try {
+        await run(send)
+      } catch (err) {
+        send('error', err instanceof Error ? err.message : 'Error desconocido')
+      } finally {
+        controller.close()
+      }
+    },
+  })
+  return new Response(stream, { headers: SSE_HEADERS })
+}
+
 export async function POST() {
+  const encoder = new TextEncoder()
+
+  // Auth y perfil deben resolverse antes de crear el stream (usan next/headers)
   const supabase = await createClient()
   const { data: { user }, error: authError } = await supabase.auth.getUser()
 
   if (authError || !user) {
-    return NextResponse.json({ error: 'No autenticado' }, { status: 401 })
+    return makeStream(async (send) => { send('error', 'No autenticado') })
   }
 
   const serviceClient = await createServiceClient()
@@ -32,74 +62,89 @@ export async function POST() {
     .eq('id', user.id)
     .single()
 
-  const profile = profileRaw as Pick<ProfileRow, 'datadis_username' | 'datadis_password_encrypted' | 'cups' | 'distributor_code' | 'point_type' | 'datadis_authorized_nif' | 'last_sync_at'> | null
+  const profile = profileRaw as Pick<
+    ProfileRow,
+    'datadis_username' | 'datadis_password_encrypted' | 'cups' | 'distributor_code' | 'point_type' | 'datadis_authorized_nif' | 'last_sync_at'
+  > | null
 
-  if (!profile) return NextResponse.json({ error: 'Perfil no encontrado' }, { status: 404 })
-  if (!profile.datadis_username || !profile.datadis_password_encrypted) return NextResponse.json({ error: 'Credenciales Datadis no configuradas' }, { status: 400 })
-  if (!profile.cups || !profile.distributor_code) return NextResponse.json({ error: 'CUPS o distribuidora no configurados' }, { status: 400 })
-
-  let token: string
-  try {
-    token = await getToken(profile.datadis_username, profile.datadis_password_encrypted)
-  } catch (err) {
-    return NextResponse.json({ error: err instanceof Error ? err.message : 'Error de autenticación' }, { status: 502 })
+  if (!profile || !profile.datadis_username || !profile.datadis_password_encrypted) {
+    return makeStream(async (send) => { send('error', 'Credenciales Datadis no configuradas') })
+  }
+  if (!profile.cups || !profile.distributor_code) {
+    return makeStream(async (send) => { send('error', 'CUPS o distribuidora no configurados') })
   }
 
-  const now = new Date()
-  // Si ya hay un sync previo, pedir solo desde (last_sync_at - 5 días)
-  // para cubrir el retraso de Datadis (~2 días). Si es el primer sync, 2 meses.
-  const startDate = profile.last_sync_at
-    ? subDays(parseISO(profile.last_sync_at), 5)
-    : startOfMonth(subMonths(now, 2))
+  // Capturar valores para usarlos en el closure
+  const { datadis_username, datadis_password_encrypted, cups, distributor_code, point_type, datadis_authorized_nif, last_sync_at } = profile
 
-  try {
+  return makeStream(async (send) => {
+    // ── Aviso rate limit ──────────────────────────────────────────────
+    if (last_sync_at) {
+      const hoursSince = (Date.now() - new Date(last_sync_at).getTime()) / 3_600_000
+      if (hoursSince < 20) {
+        send('warn', `Última sync hace ${hoursSince.toFixed(1)}h — Datadis limita ~1 petición/día por endpoint. Si da 429 es normal.`)
+      }
+    }
+
+    // ── Token ─────────────────────────────────────────────────────────
+    send('info', `Autenticando en Datadis como ${datadis_username}...`)
+    const token = await getToken(datadis_username!, datadis_password_encrypted!)
+    send('ok', 'Token obtenido')
+
+    // ── Rango de fechas ───────────────────────────────────────────────
+    const now = new Date()
+    const startDate = last_sync_at
+      ? subDays(parseISO(last_sync_at), 5)
+      : startOfMonth(subMonths(now, 2))
+
+    const fromLabel = format(startDate, 'dd MMM yyyy', { locale: es })
+    const toLabel = format(now, 'dd MMM yyyy', { locale: es })
+    send('info', `Consultando consumo del ${fromLabel} al ${toLabel}...`)
+
+    // ── Consumo ───────────────────────────────────────────────────────
     const consumptionData = await getConsumption(token, {
-      cups: profile.cups,
-      distributorCode: profile.distributor_code,
+      cups: cups!,
+      distributorCode: distributor_code!,
       startDate: toDatadisMonth(startDate),
       endDate: toDatadisMonth(now),
       measurementType: '0',
-      pointType: String(profile.point_type ?? 5),
-      authorizedNif: profile.datadis_authorized_nif ?? undefined,
+      pointType: String(point_type ?? 5),
+      authorizedNif: datadis_authorized_nif ?? undefined,
     })
 
-    let consumptionSynced = 0
+    const count = consumptionData.timeCurve?.length ?? 0
+    send('ok', `Datadis devuelve ${count} registros horarios`)
 
-    if (consumptionData.timeCurve?.length) {
-      const rows: ConsumptionInsert[] = consumptionData.timeCurve.map((entry) => {
-        const datetime = datadisDatetimeToDate(entry.date, entry.time)
-        return {
-          user_id: user.id,
-          cups: profile.cups!,
-          datetime: datetime.toISOString(),
-          consumption_kwh: entry.consumptionKWh,
-          period: getPeriod(datetime),
-          obtained_by_real_or_max: entry.obtainMethod === 'Real',
-        }
-      })
-
-      
-      const { error } = await (serviceClient as any)
-        .from('consumption')
-        .upsert(rows, { onConflict: 'user_id,cups,datetime' })
-
-      if (error) throw new Error(`Error guardando consumo: ${(error as { message: string }).message}`)
-      consumptionSynced = rows.length
+    if (count === 0) {
+      send('warn', 'Sin datos en el rango consultado — puede ser retraso de Datadis (~2 días)')
+      await (serviceClient as any).from('profiles').update({ last_sync_at: now.toISOString() }).eq('id', user.id)
+      send('done', 'Sync completado (0 registros nuevos)')
+      return
     }
 
-    await (serviceClient as any)
-      .from('profiles')
-      .update({ last_sync_at: new Date().toISOString() })
-      .eq('id', user.id)
+    // ── Guardar ───────────────────────────────────────────────────────
+    send('info', `Guardando ${count} registros en base de datos...`)
 
-    const result: SyncResult = {
-      synced: consumptionSynced,
-      from: startDate.toISOString(),
-      to: now.toISOString(),
-      pvpcSynced: 0,
-    }
-    return NextResponse.json(result)
-  } catch (err) {
-    return NextResponse.json({ error: err instanceof Error ? err.message : 'Error durante sync' }, { status: 502 })
-  }
+    const rows: ConsumptionInsert[] = consumptionData.timeCurve!.map((entry) => {
+      const datetime = datadisDatetimeToDate(entry.date, entry.time)
+      return {
+        user_id: user.id,
+        cups: cups!,
+        datetime: datetime.toISOString(),
+        consumption_kwh: entry.consumptionKWh,
+        period: getPeriod(datetime),
+        obtained_by_real_or_max: entry.obtainMethod === 'Real',
+      }
+    })
+
+    const { error: upsertError } = await (serviceClient as any)
+      .from('consumption')
+      .upsert(rows, { onConflict: 'user_id,cups,datetime' })
+
+    if (upsertError) throw new Error(`Error guardando: ${(upsertError as { message: string }).message}`)
+
+    await (serviceClient as any).from('profiles').update({ last_sync_at: now.toISOString() }).eq('id', user.id)
+
+    send('done', `✓ Sync completado — ${count} registros guardados`)
+  })
 }
