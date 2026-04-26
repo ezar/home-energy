@@ -60,10 +60,14 @@ export async function POST() {
       return
     }
 
-    send('info', `Guardando ${pvpcPrices.length} precios en base de datos...`)
+    // Deduplicate by datetime — chunk boundaries can produce repeated entries
+    const seen = new Map(pvpcPrices.map((p) => [p.datetime, p]))
+    const unique = Array.from(seen.values())
+
+    send('info', `Guardando ${unique.length} precios en base de datos...`)
 
     const serviceClient = await createServiceClient()
-    const pvpcRows: PvpcPriceInsert[] = pvpcPrices.map((p) => ({
+    const pvpcRows: PvpcPriceInsert[] = unique.map((p) => ({
       datetime: p.datetime,
       price_eur_kwh: p.priceEurKwh,
     }))
@@ -74,6 +78,6 @@ export async function POST() {
 
     if (upsertError) throw new Error(`Error guardando: ${(upsertError as { message: string }).message}`)
 
-    send('done', `✓ PVPC sync completado — ${pvpcPrices.length} precios guardados`)
+    send('done', `✓ PVPC sync completado — ${pvpcRows.length} precios guardados`)
   })
 }
