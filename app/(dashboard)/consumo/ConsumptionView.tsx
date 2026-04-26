@@ -42,10 +42,10 @@ interface Props {
 }
 
 export function ConsumptionView({ hourlyData, dailyData, monthlyData }: Props) {
-  const [view, setView] = useState<'horaria' | 'diaria' | 'mensual' | 'patron'>('horaria')
+  const [view, setView] = useState<'horaria' | 'diaria' | 'mensual' | 'patron' | 'heatmap'>('horaria')
   const [showPvpc, setShowPvpc] = useState(false)
   const [hourlyDays, setHourlyDays] = useState<7 | 14 | 30>(7)
-  const [dailyDays, setDailyDays] = useState<30 | 60 | 90>(30)
+  const [dailyDays, setDailyDays] = useState<30 | 60 | 90>(90)
 
   const filteredHourly = useMemo(() => {
     const cutoff = new Date()
@@ -91,6 +91,21 @@ export function ConsumptionView({ hourlyData, dailyData, monthlyData }: Props) {
   const monthlyAvg = monthlyData.length ? monthlyTotal / monthlyData.length : 0
   const monthlyPeak = monthlyData.length ? monthlyData.reduce((a, b) => b.totalKwh > a.totalKwh ? b : a) : null
 
+  const heatmapData = useMemo(() => {
+    const grid = Array.from({ length: 7 }, () => Array.from({ length: 24 }, () => ({ sum: 0, count: 0 })))
+    for (const d of hourlyData) {
+      const dt = new Date(d.datetime)
+      const jsDay = dt.getDay()
+      const moDay = jsDay === 0 ? 6 : jsDay - 1 // 0=Mon..6=Sun
+      const hour = dt.getHours()
+      grid[moDay][hour].sum += d.consumptionKwh
+      grid[moDay][hour].count++
+    }
+    const avgs = grid.map(row => row.map(c => c.count > 0 ? c.sum / c.count : 0))
+    const max = Math.max(...avgs.flat(), 0.001)
+    return { avgs, max }
+  }, [hourlyData])
+
   const validPattern = hourPattern.filter(h => h.avgKwh > 0)
   const peakHour = validPattern.length ? validPattern.reduce((a, b) => b.avgKwh > a.avgKwh ? b : a) : null
   const cheapHour = validPattern.length ? validPattern.reduce((a, b) => b.avgKwh < a.avgKwh ? b : a) : null
@@ -113,9 +128,9 @@ export function ConsumptionView({ hourlyData, dailyData, monthlyData }: Props) {
     <div style={{ display: 'flex', flexDirection: 'column', gap: 12 }}>
       {/* Tab bar */}
       <div style={{ display: 'flex', gap: 6, alignItems: 'center', flexWrap: 'wrap' }}>
-        {(['horaria', 'diaria', 'mensual', 'patron'] as const).map(v => (
+        {(['horaria', 'diaria', 'mensual', 'patron', 'heatmap'] as const).map(v => (
           <button key={v} style={TAB_STYLE(view === v)} onClick={() => setView(v)}>
-            {v === 'patron' ? 'Patrón' : v.charAt(0).toUpperCase() + v.slice(1)}
+            {v === 'patron' ? 'Patrón' : v === 'heatmap' ? 'Heatmap' : v.charAt(0).toUpperCase() + v.slice(1)}
           </button>
         ))}
         <div style={{ flex: 1 }} />
@@ -278,6 +293,78 @@ export function ConsumptionView({ hourlyData, dailyData, monthlyData }: Props) {
             ])}
           </>
         )}
+        {/* ── Heatmap ── */}
+        {view === 'heatmap' && (() => {
+          const DAY_LABELS = ['Lun', 'Mar', 'Mié', 'Jue', 'Vie', 'Sáb', 'Dom']
+          const DAY_LABELS_LONG = ['Lunes', 'Martes', 'Miércoles', 'Jueves', 'Viernes', 'Sábado', 'Domingo']
+          const flatAvgs = heatmapData.avgs.flat()
+          const maxVal = Math.max(...flatAvgs)
+          const maxIdx = flatAvgs.indexOf(maxVal)
+          const peakDay = Math.floor(maxIdx / 24)
+          const peakHr = maxIdx % 24
+          const dayTotals = heatmapData.avgs.map(row => row.reduce((s, v) => s + v, 0))
+          const maxDayIdx = dayTotals.indexOf(Math.max(...dayTotals))
+          const hourTotals = Array.from({ length: 24 }, (_, h) => heatmapData.avgs.reduce((s, row) => s + row[h], 0))
+          const maxHourIdx = hourTotals.indexOf(Math.max(...hourTotals))
+
+          return (
+            <>
+              <div style={{ fontSize: 10.5, fontWeight: 600, color: 'var(--dim)', textTransform: 'uppercase', letterSpacing: '0.1em', marginBottom: 4 }}>
+                Heatmap semanal
+              </div>
+              <div style={{ fontSize: 11, color: 'var(--dim2)', marginBottom: 14 }}>
+                Consumo medio por hora y día de la semana
+              </div>
+              {hourlyData.length > 0 ? (
+                <div style={{ overflowX: 'auto' }}>
+                  <div style={{ minWidth: 500, userSelect: 'none' }}>
+                    <div style={{ display: 'grid', gridTemplateColumns: '28px repeat(24, 1fr)', gap: 2, marginBottom: 4 }}>
+                      <div />
+                      {Array.from({ length: 24 }, (_, h) => (
+                        <div key={h} style={{ fontSize: 9, color: 'var(--dim)', textAlign: 'center' }}>
+                          {h % 6 === 0 ? `${h}h` : ''}
+                        </div>
+                      ))}
+                    </div>
+                    {DAY_LABELS.map((day, d) => (
+                      <div key={day} style={{ display: 'grid', gridTemplateColumns: '28px repeat(24, 1fr)', gap: 2, marginBottom: 2 }}>
+                        <div style={{ fontSize: 10, color: 'var(--dim)', display: 'flex', alignItems: 'center' }}>{day}</div>
+                        {heatmapData.avgs[d].map((val, h) => {
+                          const intensity = val / heatmapData.max
+                          const bg = intensity < 0.01
+                            ? 'var(--bg-inset)'
+                            : `rgba(96,165,250,${(0.12 + intensity * 0.82).toFixed(2)})`
+                          return (
+                            <div
+                              key={h}
+                              title={val > 0 ? `${day} ${String(h).padStart(2, '0')}:00 — ${val.toFixed(3)} kWh` : undefined}
+                              style={{ aspectRatio: '1/1', borderRadius: 2, background: bg, cursor: val > 0 ? 'help' : 'default' }}
+                            />
+                          )
+                        })}
+                      </div>
+                    ))}
+                    <div style={{ display: 'flex', alignItems: 'center', gap: 4, marginTop: 10, justifyContent: 'flex-end' }}>
+                      <span style={{ fontSize: 9, color: 'var(--dim)' }}>Bajo</span>
+                      {[0.1, 0.3, 0.5, 0.7, 0.9].map(v => (
+                        <div key={v} style={{ width: 12, height: 12, borderRadius: 2, background: `rgba(96,165,250,${(0.12 + v * 0.82).toFixed(2)})` }} />
+                      ))}
+                      <span style={{ fontSize: 9, color: 'var(--dim)' }}>Alto</span>
+                    </div>
+                  </div>
+                </div>
+              ) : (
+                <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', height: 160, color: 'var(--dim)', fontSize: 13 }}>Sin datos</div>
+              )}
+              {statRow([
+                { label: 'Día más activo', val: DAY_LABELS_LONG[maxDayIdx] ?? '—', unit: '', color: '#f87171' },
+                { label: 'Hora pico', val: `${String(peakHr).padStart(2, '0')}:00`, unit: `${maxVal.toFixed(3)} kWh`, color: '#fbbf24' },
+                { label: 'Hora global máx.', val: `${String(maxHourIdx).padStart(2, '0')}:00`, unit: '', color: '#a78bfa' },
+              ])}
+            </>
+          )
+        })()}
+
       </div>
 
       {/* Hourly detail table */}

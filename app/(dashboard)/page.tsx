@@ -1,6 +1,6 @@
 import { createClient } from '@/lib/supabase/server'
 import { Zap, DollarSign, TrendingUp, Clock } from 'lucide-react'
-import { startOfMonth, subMonths, format, subHours } from 'date-fns'
+import { startOfMonth, subMonths, format, subHours, startOfDay, addDays } from 'date-fns'
 import type { ConsumptionRow, PvpcPriceRow, ProfileRow } from '@/lib/supabase/types-helper'
 import { StatCard } from '@/components/dashboard/StatCard'
 import { ColorBadge } from '@/components/dashboard/PeriodBadge'
@@ -21,8 +21,10 @@ export default async function HomePage() {
   const startLastMonth = startOfMonth(subMonths(now, 1)).toISOString()
   const endLastMonth = startThisMonth
   const start24h = subHours(now, 24).toISOString()
+  const startToday = startOfDay(now).toISOString()
+  const endTomorrow = startOfDay(addDays(now, 2)).toISOString()
 
-  const [profileResult, thisMonthResult, lastMonthResult, latestResult, pvpcNowResult, pvpc24hResult] =
+  const [profileResult, thisMonthResult, lastMonthResult, latestResult, pvpcNowResult, pvpc24hResult, pvpcTodayResult] =
     await Promise.all([
       supabase.from('profiles').select('last_sync_at, cups, distributor_code, tariff_type, price_p1_eur_kwh, price_p2_eur_kwh, price_p3_eur_kwh, power_kw, power_price_eur_kw_month').eq('id', user.id).single(),
       supabase.from('consumption').select('consumption_kwh').eq('user_id', user.id).gte('datetime', startThisMonth),
@@ -30,6 +32,7 @@ export default async function HomePage() {
       supabase.from('consumption').select('datetime').eq('user_id', user.id).order('datetime', { ascending: false }).limit(1),
       supabase.from('pvpc_prices').select('price_eur_kwh, datetime').order('datetime', { ascending: false }).limit(1),
       supabase.from('pvpc_prices').select('price_eur_kwh, datetime').gte('datetime', start24h).order('datetime', { ascending: true }),
+      supabase.from('pvpc_prices').select('price_eur_kwh, datetime').gte('datetime', startToday).lt('datetime', endTomorrow).order('datetime', { ascending: true }),
     ])
 
   type MonthRow = Pick<ConsumptionRow, 'consumption_kwh'>
@@ -42,6 +45,7 @@ export default async function HomePage() {
   const latestRows = (latestResult.data ?? []) as LatestRow[]
   const pvpcNow = ((pvpcNowResult.data ?? []) as PvpcRow[])[0] ?? null
   const pvpc24h = (pvpc24hResult.data ?? []) as PvpcRow[]
+  const pvpcToday = (pvpcTodayResult.data ?? []) as PvpcRow[]
 
   const tariffConfig = tariffConfigFromProfile(profile ?? {})
   const currentPeriod = getPeriod(now)
@@ -66,6 +70,10 @@ export default async function HomePage() {
   const avgPvpc24h = pvpcPrices24h.length ? pvpcPrices24h.reduce((a, b) => a + b, 0) / pvpcPrices24h.length : null
   const cheapHour = pvpc24h.length ? new Date(pvpc24h.reduce((a, b) => b.price_eur_kwh < a.price_eur_kwh ? b : a).datetime).getHours() : null
   const expHour = pvpc24h.length ? new Date(pvpc24h.reduce((a, b) => b.price_eur_kwh > a.price_eur_kwh ? b : a).datetime).getHours() : null
+
+  const nowRounded = new Date(now.getFullYear(), now.getMonth(), now.getDate(), now.getHours())
+  const upcomingPvpc = pvpcToday.filter(p => new Date(p.datetime) >= nowRounded)
+  const bestHoursToday = [...upcomingPvpc].sort((a, b) => a.price_eur_kwh - b.price_eur_kwh).slice(0, 3)
 
   return (
     <div style={{ display: 'flex', flexDirection: 'column', gap: 12 }}>
@@ -174,6 +182,57 @@ export default async function HomePage() {
           }
         />
       </div>
+
+      {/* Mejor hora hoy */}
+      {bestHoursToday.length > 0 && (
+        <div style={{
+          background: 'var(--card-grad)', border: '1px solid var(--border-c)',
+          borderRadius: 12, padding: '14px 18px', boxShadow: 'var(--shadow-card)',
+        }}>
+          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 12 }}>
+            <div style={{ fontSize: 10.5, fontWeight: 600, color: 'var(--dim)', textTransform: 'uppercase', letterSpacing: '0.1em' }}>
+              Mejor hora hoy
+            </div>
+            <div style={{ fontSize: 10.5, color: 'var(--dim2)' }}>
+              {upcomingPvpc.length} horas disponibles · {format(now, 'dd MMM')}
+            </div>
+          </div>
+          <div style={{ display: 'flex', gap: 10, flexWrap: 'wrap' }}>
+            {bestHoursToday.map((p) => {
+              const dt = new Date(p.datetime)
+              const hoursDiff = Math.round((dt.getTime() - now.getTime()) / 3600000)
+              const isNow = hoursDiff === 0
+              const isTomorrow = dt.toDateString() !== now.toDateString()
+              const timeLabel = isNow ? 'ahora' : isTomorrow ? 'mañana' : `en ${hoursDiff}h`
+              const period = getPeriod(dt)
+              const pColor = PERIOD_COLORS[period]
+              return (
+                <div key={p.datetime} style={{
+                  flex: '1 1 120px', padding: '10px 12px', borderRadius: 8,
+                  background: isNow ? 'rgba(52,211,153,0.08)' : 'rgba(96,165,250,0.05)',
+                  border: `1px solid ${isNow ? 'rgba(52,211,153,0.3)' : 'var(--border-c)'}`,
+                }}>
+                  <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 4 }}>
+                    <span style={{ fontFamily: 'var(--font-mono)', fontSize: 16, fontWeight: 700, color: 'var(--text)' }}>
+                      {String(dt.getHours()).padStart(2, '0')}:00
+                    </span>
+                    <span style={{ fontSize: 9.5, color: isNow ? '#34d399' : '#60a5fa', fontWeight: 500 }}>
+                      {timeLabel}
+                    </span>
+                  </div>
+                  <div style={{ fontSize: 13, fontFamily: 'var(--font-mono)', fontWeight: 600, color: '#34d399', marginBottom: 4 }}>
+                    {p.price_eur_kwh.toFixed(5)} €/kWh
+                  </div>
+                  <div style={{ display: 'flex', alignItems: 'center', gap: 4 }}>
+                    <div style={{ width: 6, height: 6, borderRadius: 1, background: pColor, flexShrink: 0 }} />
+                    <span style={{ fontSize: 10, color: pColor }}>{PERIOD_NAMES[period]}</span>
+                  </div>
+                </div>
+              )
+            })}
+          </div>
+        </div>
+      )}
 
       {/* PVPC 24h chart */}
       {pvpc24hForChart.length > 0 && (
