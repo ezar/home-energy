@@ -1,244 +1,132 @@
+import { getTranslations } from 'next-intl/server'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import { Plug, Key, Zap, ShieldCheck, Clock, TrendingUp, BarChart3, HelpCircle, RefreshCw } from 'lucide-react'
 
-export default function AyudaPage() {
+export default async function HelpPage() {
+  const t = await getTranslations('Help')
+
   return (
     <div className="max-w-3xl mx-auto py-8 px-4 space-y-10">
       <div>
         <h1 className="text-xl font-semibold mb-1 flex items-center gap-2">
           <HelpCircle size={20} className="text-blue-400" />
-          Guía de uso
+          {t('title')}
         </h1>
-        <p className="text-sm text-muted-foreground">
-          Todo lo que necesitas saber para configurar y sacar partido al dashboard.
-        </p>
+        <p className="text-sm text-muted-foreground">{t('subtitle')}</p>
       </div>
 
-      {/* --- Datadis --- */}
       <section className="space-y-4">
-        <h2 className="text-base font-semibold border-b border-border pb-2">Conectar Datadis</h2>
-
+        <h2 className="text-base font-semibold border-b border-border pb-2">{t('sectionDatadis')}</h2>
         <Card>
           <CardHeader className="pb-2">
             <CardTitle className="text-sm flex items-center gap-2">
               <Plug size={14} className="text-blue-400" />
-              ¿Qué es Datadis?
+              {t('whatIsTitle')}
             </CardTitle>
           </CardHeader>
           <CardContent className="text-sm text-muted-foreground space-y-2">
-            <p>
-              Datadis (<span className="font-mono text-foreground">datadis.es</span>) es la plataforma
-              oficial de las distribuidoras eléctricas españolas. Centraliza los datos de tu contador
-              inteligente: consumo horario, maxímetro y datos de suministro.
-            </p>
-            <p>
-              Para registrarte necesitas tu NIF y los datos de tu contrato de luz
-              (CUPS o referencia de factura). La activación de la cuenta puede tardar 24–48 h.
-            </p>
+            <p>{t('whatIsBody1')}</p>
+            <p>{t('whatIsBody2')}</p>
           </CardContent>
         </Card>
-
         <Card>
           <CardHeader className="pb-2">
             <CardTitle className="text-sm flex items-center gap-2">
               <Key size={14} className="text-yellow-400" />
-              Añadir tus credenciales
+              {t('credentialsTitle')}
             </CardTitle>
           </CardHeader>
           <CardContent className="text-sm text-muted-foreground space-y-2">
-            <p>
-              Ve a <strong>Configuración</strong> e introduce tu NIF y contraseña de Datadis.
-              Pulsa <em>Verificar conexión</em> para confirmar que son correctas.
-              Si tienes varios puntos de suministro (CUPS), aparecerán listados y podrás
-              seleccionar los que quieras monitorizar.
-            </p>
-            <p>
-              Si tienes acceso autorizado al contador de otra persona (p. ej., un familiar),
-              introduce su NIF en el campo <em>NIF autorizado</em>.
-            </p>
+            <p>{t('credentialsBody1')}</p>
+            <p>{t('credentialsBody2')}</p>
           </CardContent>
         </Card>
-
         <Card>
           <CardHeader className="pb-2">
             <CardTitle className="text-sm flex items-center gap-2">
               <ShieldCheck size={14} className="text-purple-400" />
-              Seguridad de tus credenciales
+              {t('securityTitle')}
             </CardTitle>
           </CardHeader>
-          <CardContent className="text-sm text-muted-foreground space-y-2">
-            <p>
-              Tu contraseña de Datadis se guarda <strong>cifrada</strong> en la base de datos
-              con AES-256-GCM. Nunca se envía al navegador ni aparece en los logs.
-              Todas las llamadas a la API de Datadis se realizan exclusivamente desde el servidor.
-            </p>
+          <CardContent className="text-sm text-muted-foreground">
+            <p>{t('securityBody')}</p>
           </CardContent>
         </Card>
       </section>
 
-      {/* --- Sincronización --- */}
       <section className="space-y-4">
-        <h2 className="text-base font-semibold border-b border-border pb-2">Sincronización de datos</h2>
-
+        <h2 className="text-base font-semibold border-b border-border pb-2">{t('sectionSync')}</h2>
         <Card>
           <CardHeader className="pb-2">
             <CardTitle className="text-sm flex items-center gap-2">
               <RefreshCw size={14} className="text-green-400" />
-              ¿Cuándo se actualizan los datos?
+              {t('syncTitle')}
             </CardTitle>
           </CardHeader>
           <CardContent className="text-sm text-muted-foreground space-y-2">
-            <p>
-              La sincronización automática se ejecuta cada noche a las <strong>05:00</strong>.
-              También puedes lanzarla manualmente desde la página de Configuración o con el botón
-              de la barra superior.
-            </p>
-            <p>
-              Datadis publica los datos con un <strong>retraso de hasta 2 días</strong>, por lo que
-              los últimos registros disponibles suelen ser de anteayer.
-            </p>
-            <p>
-              En la primera sincronización se importa hasta <strong>2 años</strong> de histórico.
-            </p>
+            <p>{t('syncBody1')}</p>
+            <p>{t('syncBody2')}</p>
+            <p>{t('syncBody3')}</p>
           </CardContent>
         </Card>
       </section>
 
-      {/* --- Tarifas --- */}
       <section className="space-y-4">
-        <h2 className="text-base font-semibold border-b border-border pb-2">Períodos tarifarios 2.0TD</h2>
-
+        <h2 className="text-base font-semibold border-b border-border pb-2">{t('sectionTariff')}</h2>
         <Card>
           <CardContent className="pt-4 text-sm text-muted-foreground space-y-3">
-            <p>
-              La tarifa doméstica estándar en España (2.0TD) divide el día en tres períodos
-              con diferente precio de la energía:
-            </p>
+            <p>{t('tariffIntro')}</p>
             <div className="space-y-2">
-              <div className="flex items-start gap-3">
-                <span className="mt-0.5 w-3 h-3 rounded-full flex-shrink-0" style={{ background: '#ef4444' }} />
-                <div>
-                  <span className="font-medium text-foreground">P1 — Punta</span>
-                  <p className="text-xs mt-0.5">Lunes a viernes de 10:00 a 14:00 y de 18:00 a 22:00. Precio más caro.</p>
+              {([
+                { color: '#ef4444', name: 'P1 Punta', desc: t('p1Desc') },
+                { color: '#f59e0b', name: 'P2 Llano', desc: t('p2Desc') },
+                { color: '#22c55e', name: 'P3 Valle', desc: t('p3Desc') },
+              ]).map(({ color, name, desc }) => (
+                <div key={name} className="flex items-start gap-3">
+                  <span className="mt-0.5 w-3 h-3 rounded-full flex-shrink-0" style={{ background: color }} />
+                  <div>
+                    <span className="font-medium text-foreground">{name}</span>
+                    <p className="text-xs mt-0.5">{desc}</p>
+                  </div>
                 </div>
-              </div>
-              <div className="flex items-start gap-3">
-                <span className="mt-0.5 w-3 h-3 rounded-full flex-shrink-0" style={{ background: '#f59e0b' }} />
-                <div>
-                  <span className="font-medium text-foreground">P2 — Llano</span>
-                  <p className="text-xs mt-0.5">Lunes a viernes de 08:00 a 10:00, de 14:00 a 18:00 y de 22:00 a 00:00. Precio intermedio.</p>
-                </div>
-              </div>
-              <div className="flex items-start gap-3">
-                <span className="mt-0.5 w-3 h-3 rounded-full flex-shrink-0" style={{ background: '#22c55e' }} />
-                <div>
-                  <span className="font-medium text-foreground">P3 — Valle</span>
-                  <p className="text-xs mt-0.5">Noches (00:00–08:00), fines de semana y festivos nacionales. Precio más barato.</p>
-                </div>
-              </div>
+              ))}
             </div>
-            <p className="text-xs pt-1">
-              Los festivos nacionales se tratan como P3 en su totalidad.
-              Si tienes tarifa PVPC, el precio varía hora a hora según el mercado.
-            </p>
+            <p className="text-xs pt-1">{t('tariffNote')}</p>
           </CardContent>
         </Card>
       </section>
 
-      {/* --- Secciones del dashboard --- */}
       <section className="space-y-4">
-        <h2 className="text-base font-semibold border-b border-border pb-2">Secciones del dashboard</h2>
-
+        <h2 className="text-base font-semibold border-b border-border pb-2">{t('sectionPages')}</h2>
         <div className="grid gap-3 sm:grid-cols-2">
-          <Card>
-            <CardHeader className="pb-1">
-              <CardTitle className="text-sm flex items-center gap-2">
-                <Zap size={14} className="text-yellow-400" />
-                Resumen
-              </CardTitle>
-            </CardHeader>
-            <CardContent className="text-xs text-muted-foreground">
-              Consumo del mes actual, coste estimado, precio PVPC en tiempo real y
-              recomendaciones de las horas más baratas para electrodomésticos.
-            </CardContent>
-          </Card>
-
-          <Card>
-            <CardHeader className="pb-1">
-              <CardTitle className="text-sm flex items-center gap-2">
-                <BarChart3 size={14} className="text-blue-400" />
-                Consumo
-              </CardTitle>
-            </CardHeader>
-            <CardContent className="text-xs text-muted-foreground">
-              Gráficas horarias, diarias y mensuales. Comparativa con la misma franja
-              de las semanas anteriores y desglose por período P1/P2/P3.
-            </CardContent>
-          </Card>
-
-          <Card>
-            <CardHeader className="pb-1">
-              <CardTitle className="text-sm flex items-center gap-2">
-                <Clock size={14} className="text-orange-400" />
-                Coste
-              </CardTitle>
-            </CardHeader>
-            <CardContent className="text-xs text-muted-foreground">
-              Estimación de factura según tu tarifa configurada. Puedes simular
-              distintos precios para comparar opciones comerciales.
-            </CardContent>
-          </Card>
-
-          <Card>
-            <CardHeader className="pb-1">
-              <CardTitle className="text-sm flex items-center gap-2">
-                <TrendingUp size={14} className="text-sky-400" />
-                PVPC
-              </CardTitle>
-            </CardHeader>
-            <CardContent className="text-xs text-muted-foreground">
-              Comparativa entre tu consumo real y el precio de mercado (REData).
-              Útil para evaluar si el PVPC te conviene o si sería mejor una tarifa fija.
-            </CardContent>
-          </Card>
+          {([
+            { icon: Zap,         color: 'text-yellow-400', tKey: 'summaryTitle',     dKey: 'summaryDesc' },
+            { icon: BarChart3,   color: 'text-blue-400',   tKey: 'consumptionTitle', dKey: 'consumptionDesc' },
+            { icon: Clock,       color: 'text-orange-400', tKey: 'costTitle',        dKey: 'costDesc' },
+            { icon: TrendingUp,  color: 'text-sky-400',    tKey: 'pvpcTitle',        dKey: 'pvpcDesc' },
+          ] as const).map(({ icon: Icon, color, tKey, dKey }) => (
+            <Card key={tKey}>
+              <CardHeader className="pb-1">
+                <CardTitle className="text-sm flex items-center gap-2">
+                  <Icon size={14} className={color} />
+                  {t(tKey)}
+                </CardTitle>
+              </CardHeader>
+              <CardContent className="text-xs text-muted-foreground">{t(dKey)}</CardContent>
+            </Card>
+          ))}
         </div>
       </section>
 
-      {/* --- FAQ --- */}
       <section className="space-y-4">
-        <h2 className="text-base font-semibold border-b border-border pb-2">Preguntas frecuentes</h2>
-
+        <h2 className="text-base font-semibold border-b border-border pb-2">{t('sectionFaq')}</h2>
         <div className="space-y-3 text-sm text-muted-foreground">
-          <div>
-            <p className="font-medium text-foreground mb-1">No aparecen datos tras sincronizar</p>
-            <p>
-              Comprueba que el CUPS está seleccionado en Configuración y que la cuenta de Datadis
-              tiene historial disponible. Recuerda que los datos llegan con hasta 2 días de retraso.
-            </p>
-          </div>
-          <div>
-            <p className="font-medium text-foreground mb-1">¿Puedo añadir varios suministros?</p>
-            <p>
-              Sí. Si tu cuenta de Datadis tiene acceso a varios CUPS (p. ej., casa y garaje),
-              aparecerán todos al verificar la conexión. Activa los que quieras monitorizar.
-              Usa el selector de suministro en la parte superior del dashboard para cambiar entre ellos.
-            </p>
-          </div>
-          <div>
-            <p className="font-medium text-foreground mb-1">El precio estimado no coincide con mi factura</p>
-            <p>
-              El coste que muestra el dashboard es una <strong>estimación</strong> basada solo en la
-              energía consumida. La factura real incluye además el término de potencia, impuestos
-              (IVA, impuesto eléctrico) y otros cargos que dependen de tu comercializadora.
-            </p>
-          </div>
-          <div>
-            <p className="font-medium text-foreground mb-1">¿Cómo activo las notificaciones de precio?</p>
-            <p>
-              En Configuración → <em>Notificaciones de precio</em>, establece un umbral en €/kWh
-              y activa las notificaciones push. El navegador pedirá permiso la primera vez.
-            </p>
-          </div>
+          {(['faq1', 'faq2', 'faq3', 'faq4'] as const).map((key) => (
+            <div key={key}>
+              <p className="font-medium text-foreground mb-1">{t(`${key}Q` as Parameters<typeof t>[0])}</p>
+              <p>{t(`${key}A` as Parameters<typeof t>[0])}</p>
+            </div>
+          ))}
         </div>
       </section>
     </div>

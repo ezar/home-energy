@@ -1,11 +1,13 @@
 'use client'
 
 import { useRouter } from 'next/navigation'
+import { useTranslations } from 'next-intl'
 import { createClient } from '@/lib/supabase/client'
 import { LogOut } from 'lucide-react'
 
 export function SignOutButton() {
   const router = useRouter()
+  const t = useTranslations('SignOut')
 
   async function handleSignOut() {
     const supabase = createClient()
@@ -17,7 +19,7 @@ export function SignOutButton() {
   return (
     <button
       onClick={handleSignOut}
-      title="Cerrar sesión"
+      title={t('label')}
       style={{
         width: 32, height: 32, borderRadius: 8,
         display: 'flex', alignItems: 'center', justifyContent: 'center',

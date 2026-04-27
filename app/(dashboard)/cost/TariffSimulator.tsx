@@ -1,6 +1,7 @@
 'use client'
 
 import { useState } from 'react'
+import { useTranslations } from 'next-intl'
 
 interface MonthData {
   label: string
@@ -31,6 +32,9 @@ const INPUT: React.CSSProperties = {
 const PERIOD_COLORS: Record<string, string> = { p1: '#f87171', p2: '#fbbf24', p3: '#34d399' }
 
 export function TariffSimulator({ months, currentP1, currentP2, currentP3 }: Props) {
+  const t = useTranslations('TariffSimulator')
+  const tp = useTranslations('Period')
+
   const [simP1, setSimP1] = useState(String(currentP1?.toFixed(5) ?? ''))
   const [simP2, setSimP2] = useState(String(currentP2?.toFixed(5) ?? ''))
   const [simP3, setSimP3] = useState(String(currentP3?.toFixed(5) ?? ''))
@@ -52,22 +56,23 @@ export function TariffSimulator({ months, currentP1, currentP2, currentP3 }: Pro
   const annualFactor = 12 / Math.max(months.length, 1)
   const annualDiff = totalDiff * annualFactor
 
+  const periodInputs = [
+    { key: 'p1', label: tp('1'), val: simP1, set: setSimP1 },
+    { key: 'p2', label: tp('2'), val: simP2, set: setSimP2 },
+    { key: 'p3', label: tp('3'), val: simP3, set: setSimP3 },
+  ] as const
+
   return (
     <div style={CARD}>
       <div style={{ fontSize: 10.5, fontWeight: 600, color: 'var(--dim)', textTransform: 'uppercase', letterSpacing: '0.1em', marginBottom: 4 }}>
-        Calculadora de cambio de tarifa
+        {t('title')}
       </div>
       <div style={{ fontSize: 11, color: 'var(--dim2)', marginBottom: 14 }}>
-        Simula qué costaría tu consumo con otros precios P1/P2/P3
+        {t('subtitle')}
       </div>
 
-      {/* Price inputs */}
       <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: 10, marginBottom: 16 }}>
-        {([
-          { key: 'p1', label: 'P1 Punta', val: simP1, set: setSimP1 },
-          { key: 'p2', label: 'P2 Llano', val: simP2, set: setSimP2 },
-          { key: 'p3', label: 'P3 Valle', val: simP3, set: setSimP3 },
-        ] as const).map(({ key, label, val, set }) => (
+        {periodInputs.map(({ key, label, val, set }) => (
           <div key={key}>
             <div style={{ display: 'flex', alignItems: 'center', gap: 5, marginBottom: 5 }}>
               <div style={{ width: 7, height: 7, borderRadius: 2, background: PERIOD_COLORS[key], flexShrink: 0 }} />
@@ -87,12 +92,11 @@ export function TariffSimulator({ months, currentP1, currentP2, currentP3 }: Pro
         ))}
       </div>
 
-      {/* Results */}
       {hasValues && (
         <>
           <div style={{ display: 'grid', gridTemplateColumns: '1fr repeat(3, auto)', gap: 0, marginBottom: 10, borderTop: '1px solid var(--border-subtle)', paddingTop: 14 }}>
-            {['Mes', 'Actual', 'Simulado', 'Diferencia'].map(h => (
-              <div key={h} style={{ fontSize: 9.5, fontWeight: 600, color: 'var(--dim)', textTransform: 'uppercase', letterSpacing: '0.06em', padding: '3px 8px', borderBottom: '1px solid var(--border-c)', textAlign: h === 'Mes' ? 'left' : 'right' }}>{h}</div>
+            {[t('colMonth'), t('colActual'), t('colSimulated'), t('colDiff')].map(h => (
+              <div key={h} style={{ fontSize: 9.5, fontWeight: 600, color: 'var(--dim)', textTransform: 'uppercase', letterSpacing: '0.06em', padding: '3px 8px', borderBottom: '1px solid var(--border-c)', textAlign: h === t('colMonth') ? 'left' : 'right' }}>{h}</div>
             ))}
             {simResults.map((m, i) => {
               const diffColor = m.diff > 0.005 ? '#f87171' : m.diff < -0.005 ? '#34d399' : 'var(--dim)'
@@ -113,11 +117,10 @@ export function TariffSimulator({ months, currentP1, currentP2, currentP3 }: Pro
             })}
           </div>
 
-          {/* Summary */}
           <div style={{ display: 'flex', gap: 10, flexWrap: 'wrap', paddingTop: 10, borderTop: '1px solid var(--border-subtle)' }}>
             {[
-              { label: `Total (${months.length} meses)`, val: `${totalDiff > 0 ? '+' : ''}${totalDiff.toFixed(2)} €`, color: totalDiff > 0.01 ? '#f87171' : totalDiff < -0.01 ? '#34d399' : 'var(--dim)' },
-              { label: 'Proyección anual', val: `${annualDiff > 0 ? '+' : ''}${annualDiff.toFixed(2)} €/año`, color: annualDiff > 0.01 ? '#f87171' : annualDiff < -0.01 ? '#34d399' : 'var(--dim)' },
+              { label: t('totalMonths', { months: months.length }), val: `${totalDiff > 0 ? '+' : ''}${totalDiff.toFixed(2)} €`, color: totalDiff > 0.01 ? '#f87171' : totalDiff < -0.01 ? '#34d399' : 'var(--dim)' },
+              { label: t('annualProjection'), val: `${annualDiff > 0 ? '+' : ''}${annualDiff.toFixed(2)} €/año`, color: annualDiff > 0.01 ? '#f87171' : annualDiff < -0.01 ? '#34d399' : 'var(--dim)' },
             ].map(({ label, val, color }) => (
               <div key={label} style={{ flex: '1 1 140px', padding: '10px 14px', borderRadius: 8, background: 'var(--bg-inset)', border: '1px solid var(--border-c)' }}>
                 <div style={{ fontSize: 10, color: 'var(--dim)', marginBottom: 4 }}>{label}</div>
@@ -127,10 +130,10 @@ export function TariffSimulator({ months, currentP1, currentP2, currentP3 }: Pro
             <div style={{ flex: '2 1 200px', padding: '10px 14px', borderRadius: 8, background: 'var(--bg-inset)', border: '1px solid var(--border-c)', display: 'flex', alignItems: 'center' }}>
               <div style={{ fontSize: 11, color: 'var(--dim)', lineHeight: 1.6 }}>
                 {Math.abs(annualDiff) < 5
-                  ? 'Sin diferencia significativa entre tarifas.'
+                  ? t('noSignificantDiff')
                   : annualDiff < 0
-                    ? `La tarifa simulada ahorraría ${Math.abs(annualDiff).toFixed(0)} €/año con tu patrón de consumo actual.`
-                    : `La tarifa simulada costaría ${annualDiff.toFixed(0)} €/año más que la actual.`}
+                    ? t('simulatedSaves', { amount: Math.abs(annualDiff).toFixed(0) })
+                    : t('simulatedCosts', { amount: annualDiff.toFixed(0) })}
               </div>
             </div>
           </div>
@@ -139,7 +142,7 @@ export function TariffSimulator({ months, currentP1, currentP2, currentP3 }: Pro
 
       {!hasValues && (
         <div style={{ fontSize: 11, color: 'var(--dim2)', padding: '10px 0' }}>
-          Introduce los precios de la tarifa a comparar para ver la simulación.
+          {t('enterPrices')}
         </div>
       )}
     </div>

@@ -1,6 +1,7 @@
 'use client'
 
 import { useState, useRef, useEffect } from 'react'
+import { useTranslations } from 'next-intl'
 import { createClient } from '@/lib/supabase/client'
 import { Loader2, CheckCircle2, AlertCircle, ShieldCheck, Eye, EyeOff, RefreshCw, Zap, Info } from 'lucide-react'
 import type { ProfileRow, UserSupplyRow } from '@/lib/supabase/types-helper'
@@ -52,6 +53,8 @@ const SECTION_LABEL: React.CSSProperties = {
 }
 
 export function ConfigForm({ profile, supplies: initialSupplies }: ConfigFormProps) {
+  const t = useTranslations('Settings')
+  const tc = useTranslations('Common')
   const supabase = createClient()
 
   const [datadisUsername, setDatadisUsername] = useState(profile?.datadis_username ?? '')
@@ -114,7 +117,6 @@ export function ConfigForm({ profile, supplies: initialSupplies }: ConfigFormPro
       return
     }
 
-    // Contraseña Datadis: siempre server-side para cifrado correcto
     if (datadisPassword) {
       const res = await fetch('/api/datadis/credentials', {
         method: 'PATCH',
@@ -123,14 +125,14 @@ export function ConfigForm({ profile, supplies: initialSupplies }: ConfigFormPro
       })
       if (!res.ok) {
         const d = await res.json().catch(() => ({})) as { error?: string }
-        setSaveMsg({ ok: false, text: d.error ?? 'Error guardando contraseña' })
+        setSaveMsg({ ok: false, text: d.error ?? t('errorSavingPassword') })
         setSaving(false)
         return
       }
       setDatadisPassword('')
     }
 
-    setSaveMsg({ ok: true, text: 'Guardado' })
+    setSaveMsg({ ok: true, text: t('saved') })
     setSaving(false)
   }
 
@@ -140,9 +142,9 @@ export function ConfigForm({ profile, supplies: initialSupplies }: ConfigFormPro
     try {
       const res = await fetch('/api/datadis/supplies')
       const data = await res.json()
-      setTestResult(res.ok ? { ok: true, supplies: data.supplies ?? [] } : { ok: false, error: data.error ?? 'Error de conexión' })
+      setTestResult(res.ok ? { ok: true, supplies: data.supplies ?? [] } : { ok: false, error: data.error ?? t('errorConnection') })
     } catch {
-      setTestResult({ ok: false, error: 'Error de red' })
+      setTestResult({ ok: false, error: t('errorNetwork') })
     } finally {
       setTesting(false)
     }
@@ -174,7 +176,7 @@ export function ConfigForm({ profile, supplies: initialSupplies }: ConfigFormPro
         }
       }
     } catch {
-      setSyncLogs(prev => [...prev, { id: ++logIdRef.current, type: 'error', msg: 'Error de red' }])
+      setSyncLogs(prev => [...prev, { id: ++logIdRef.current, type: 'error', msg: t('errorNetwork') }])
     } finally {
       setSyncingDatadis(false)
     }
@@ -206,7 +208,7 @@ export function ConfigForm({ profile, supplies: initialSupplies }: ConfigFormPro
         }
       }
     } catch {
-      setSyncLogs(prev => [...prev, { id: ++logIdRef.current, type: 'error', msg: 'Error de red' }])
+      setSyncLogs(prev => [...prev, { id: ++logIdRef.current, type: 'error', msg: t('errorNetwork') }])
     } finally {
       setSyncingPvpc(false)
     }
@@ -243,22 +245,22 @@ export function ConfigForm({ profile, supplies: initialSupplies }: ConfigFormPro
       if (pushEnabled) {
         await fetch('/api/push', { method: 'DELETE' })
         setPushEnabled(false)
-        setPushMsg({ ok: true, text: 'Notificaciones desactivadas' })
+        setPushMsg({ ok: true, text: t('notificationsDisabled') })
       } else {
         if (!('Notification' in window)) {
-          setPushMsg({ ok: false, text: 'Este navegador no soporta notificaciones' })
+          setPushMsg({ ok: false, text: t('browserNotSupported') })
           return
         }
         const permission = await Notification.requestPermission()
         if (permission !== 'granted') {
-          setPushMsg({ ok: false, text: 'Permiso denegado por el navegador' })
+          setPushMsg({ ok: false, text: t('notificationDenied') })
           return
         }
         const reg = await navigator.serviceWorker.register('/sw.js')
         await navigator.serviceWorker.ready
         const { publicKey } = await fetch('/api/push').then(r => r.json()) as { publicKey: string }
         if (!publicKey) {
-          setPushMsg({ ok: false, text: 'VAPID keys no configuradas en el servidor' })
+          setPushMsg({ ok: false, text: t('vapidNotConfigured') })
           return
         }
         const subscription = await reg.pushManager.subscribe({
@@ -274,16 +276,15 @@ export function ConfigForm({ profile, supplies: initialSupplies }: ConfigFormPro
           }),
         })
         setPushEnabled(true)
-        setPushMsg({ ok: true, text: 'Notificaciones activadas en este dispositivo' })
+        setPushMsg({ ok: true, text: t('notificationsEnabled') })
       }
     } catch (err) {
-      setPushMsg({ ok: false, text: err instanceof Error ? err.message : 'Error desconocido' })
+      setPushMsg({ ok: false, text: err instanceof Error ? err.message : t('unknownError') })
     } finally {
       setPushLoading(false)
     }
   }
 
-  // Auto-scroll log box to bottom on new entries
   useEffect(() => {
     if (logBoxRef.current) {
       logBoxRef.current.scrollTop = logBoxRef.current.scrollHeight
@@ -291,7 +292,7 @@ export function ConfigForm({ profile, supplies: initialSupplies }: ConfigFormPro
   }, [syncLogs])
 
   const lastSync = profile?.last_sync_at
-    ? new Date(profile.last_sync_at).toLocaleString('es-ES', { day: 'numeric', month: 'short', year: 'numeric', hour: '2-digit', minute: '2-digit' })
+    ? new Date(profile.last_sync_at).toLocaleString(undefined, { day: 'numeric', month: 'short', year: 'numeric', hour: '2-digit', minute: '2-digit' })
     : null
 
   return (
@@ -301,30 +302,30 @@ export function ConfigForm({ profile, supplies: initialSupplies }: ConfigFormPro
       {/* LEFT: form */}
       <form onSubmit={handleSave} style={{ display: 'flex', flexDirection: 'column', gap: 12 }}>
         <div style={CARD}>
-          <div style={SECTION_LABEL}>Perfil</div>
+          <div style={SECTION_LABEL}>{t('profile')}</div>
           <div>
-            <label style={LABEL}>Nombre</label>
-            <input style={INPUT} value={displayName} onChange={e => setDisplayName(e.target.value)} placeholder="Tu nombre" />
+            <label style={LABEL}>{t('name')}</label>
+            <input style={INPUT} value={displayName} onChange={e => setDisplayName(e.target.value)} placeholder={t('namePlaceholder')} />
           </div>
         </div>
 
         <div style={CARD}>
           <div style={{ display: 'flex', alignItems: 'center', gap: 6, marginBottom: 12 }}>
-            <div style={SECTION_LABEL as React.CSSProperties}>Credenciales Datadis</div>
+            <div style={SECTION_LABEL as React.CSSProperties}>{t('datadisCredentials')}</div>
             <div style={{ display: 'flex', alignItems: 'center', gap: 4, fontSize: 10.5, color: 'var(--dim)', marginBottom: 12 }}>
-              <ShieldCheck size={11} /> Solo en el servidor
+              <ShieldCheck size={11} /> {t('serverOnly')}
             </div>
           </div>
           <div style={{ display: 'flex', flexDirection: 'column', gap: 12 }}>
             <div className="g2" style={{ gap: 10 }}>
               <div>
-                <label style={LABEL}>NIF / Usuario</label>
-                <input style={INPUT} value={datadisUsername} onChange={e => setDatadisUsername(e.target.value)} placeholder="12345678A" autoComplete="off" />
+                <label style={LABEL}>{t('nif')}</label>
+                <input style={INPUT} value={datadisUsername} onChange={e => setDatadisUsername(e.target.value)} placeholder={t('nifPlaceholder')} autoComplete="off" />
               </div>
               <div>
                 <label style={LABEL}>
-                  Contraseña
-                  {profile?.datadis_password_encrypted && <span style={{ color: 'var(--dim)', fontWeight: 400, marginLeft: 6 }}>(guardada)</span>}
+                  {t('password')}
+                  {profile?.datadis_password_encrypted && <span style={{ color: 'var(--dim)', fontWeight: 400, marginLeft: 6 }}>{t('passwordSaved')}</span>}
                 </label>
                 <div style={{ position: 'relative' }}>
                   <input
@@ -332,7 +333,7 @@ export function ConfigForm({ profile, supplies: initialSupplies }: ConfigFormPro
                     type={showPassword ? 'text' : 'password'}
                     value={datadisPassword}
                     onChange={e => setDatadisPassword(e.target.value)}
-                    placeholder={profile?.datadis_password_encrypted ? '••••••••' : 'Nueva contraseña'}
+                    placeholder={profile?.datadis_password_encrypted ? t('passwordSavedPlaceholder') : t('newPasswordPlaceholder')}
                     autoComplete="new-password"
                   />
                   <button type="button" onClick={() => setShowPassword(p => !p)}
@@ -343,30 +344,30 @@ export function ConfigForm({ profile, supplies: initialSupplies }: ConfigFormPro
               </div>
             </div>
             <div>
-              <label style={LABEL}>NIF autorizado (opcional)</label>
-              <input style={INPUT} value={authorizedNif} onChange={e => setAuthorizedNif(e.target.value)} placeholder="Solo si no eres el titular del contrato" autoComplete="off" />
+              <label style={LABEL}>{t('authorizedNif')}</label>
+              <input style={INPUT} value={authorizedNif} onChange={e => setAuthorizedNif(e.target.value)} placeholder={t('authorizedNifPlaceholder')} autoComplete="off" />
             </div>
           </div>
         </div>
 
         <div style={CARD}>
-          <div style={SECTION_LABEL}>Suministro</div>
+          <div style={SECTION_LABEL}>{t('supply')}</div>
           <div style={{ display: 'flex', flexDirection: 'column', gap: 12 }}>
             <div className="g2" style={{ gap: 10 }}>
               <div>
-                <label style={LABEL}>CUPS</label>
-                <input style={{ ...INPUT, fontFamily: 'var(--font-mono)', fontSize: 11 }} value={cups} onChange={e => setCups(e.target.value)} placeholder="ES0021000XXXXXXXXX" autoComplete="off" />
+                <label style={LABEL}>{t('cups')}</label>
+                <input style={{ ...INPUT, fontFamily: 'var(--font-mono)', fontSize: 11 }} value={cups} onChange={e => setCups(e.target.value)} placeholder={t('cupsPlaceholder')} autoComplete="off" />
               </div>
               <div>
-                <label style={LABEL}>Código distribuidora</label>
-                <input style={INPUT} value={distributorCode} onChange={e => setDistributorCode(e.target.value)} placeholder="0022, 0023…" />
+                <label style={LABEL}>{t('distributorCode')}</label>
+                <input style={INPUT} value={distributorCode} onChange={e => setDistributorCode(e.target.value)} placeholder={t('distributorPlaceholder')} />
               </div>
             </div>
 
             <div style={{ display: 'flex', gap: 8 }}>
               <button type="button" style={BTN_DEFAULT} onClick={handleTestConnection} disabled={testing || !datadisUsername}>
                 {testing ? <Loader2 size={12} className="spin" /> : null}
-                {testing ? 'Verificando...' : 'Verificar conexión'}
+                {testing ? t('verifying') : t('verify')}
               </button>
             </div>
 
@@ -379,7 +380,7 @@ export function ConfigForm({ profile, supplies: initialSupplies }: ConfigFormPro
               }}>
                 {testResult.ok ? (
                   <div>
-                    <div style={{ marginBottom: 6 }}>✓ Conexión OK · {testResult.supplies?.length ?? 0} suministro(s)</div>
+                    <div style={{ marginBottom: 6 }}>{t('verifyOk', { count: testResult.supplies?.length ?? 0 })}</div>
                     {testResult.supplies?.map(s => {
                       const already = localSupplies.some(ls => ls.cups === s.cups)
                       return (
@@ -390,14 +391,14 @@ export function ConfigForm({ profile, supplies: initialSupplies }: ConfigFormPro
                             <ColorBadge color="#38bdf8">Dist. {s.distributorCode}</ColorBadge>
                             <ColorBadge color="#fbbf24">Tipo {s.pointType}</ColorBadge>
                             {already
-                              ? <ColorBadge color="#34d399">✓ Añadido</ColorBadge>
+                              ? <ColorBadge color="#34d399">{t('added')}</ColorBadge>
                               : (
                                 <button type="button" onClick={() => handleAddSupply(s.cups, s.distributorCode)} style={{
                                   padding: '2px 8px', borderRadius: 5, cursor: 'pointer', fontSize: 10, fontWeight: 500,
                                   background: 'rgba(245,158,11,0.12)', color: 'var(--nav-active-text)',
                                   border: '1px solid rgba(245,158,11,0.25)', fontFamily: 'var(--font-sans)',
                                 }}>
-                                  + Añadir suministro
+                                  {t('addSupply')}
                                 </button>
                               )
                             }
@@ -416,29 +417,29 @@ export function ConfigForm({ profile, supplies: initialSupplies }: ConfigFormPro
 
         {/* Tarifa */}
         <div style={CARD}>
-          <div style={SECTION_LABEL}>Tarifa eléctrica</div>
+          <div style={SECTION_LABEL}>{t('tariff')}</div>
           <div style={{ display: 'flex', gap: 6, marginBottom: 16 }}>
-            {(['pvpc', 'fixed'] as const).map(t => (
-              <button key={t} type="button" onClick={() => setTariffType(t)} style={{
+            {(['pvpc', 'fixed'] as const).map(tt => (
+              <button key={tt} type="button" onClick={() => setTariffType(tt)} style={{
                 padding: '6px 14px', borderRadius: 8, cursor: 'pointer', fontSize: 12, fontWeight: 500,
-                background: tariffType === t ? 'rgba(245,158,11,0.12)' : 'var(--btn-bg)',
-                color: tariffType === t ? 'var(--nav-active-text)' : 'var(--btn-text)',
-                border: `1px solid ${tariffType === t ? 'rgba(245,158,11,0.25)' : 'var(--btn-border)'}`,
+                background: tariffType === tt ? 'rgba(245,158,11,0.12)' : 'var(--btn-bg)',
+                color: tariffType === tt ? 'var(--nav-active-text)' : 'var(--btn-text)',
+                border: `1px solid ${tariffType === tt ? 'rgba(245,158,11,0.25)' : 'var(--btn-border)'}`,
                 fontFamily: 'var(--font-sans)', transition: 'all 0.15s',
               }}>
-                {t === 'pvpc' ? 'PVPC (variable)' : 'Tarifa fija'}
+                {tt === 'pvpc' ? t('tariffPvpc') : t('tariffFixed')}
               </button>
             ))}
           </div>
 
           {tariffType === 'fixed' && (
             <div style={{ marginBottom: 16 }}>
-              <div style={{ fontSize: 11, color: 'var(--dim)', marginBottom: 10 }}>Precio por período (€/kWh)</div>
+              <div style={{ fontSize: 11, color: 'var(--dim)', marginBottom: 10 }}>{t('priceByPeriod')}</div>
               <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
                 {[
-                  { label: 'P1 Punta (10–14h y 18–22h lab.)', val: priceP1, set: setPriceP1, color: '#f87171' },
-                  { label: 'P2 Llano', val: priceP2, set: setPriceP2, color: '#fbbf24' },
-                  { label: 'P3 Valle (noches y fines de semana)', val: priceP3, set: setPriceP3, color: '#34d399' },
+                  { label: t('p1Label'), val: priceP1, set: setPriceP1, color: '#f87171' },
+                  { label: t('p2Label'), val: priceP2, set: setPriceP2, color: '#fbbf24' },
+                  { label: t('p3Label'), val: priceP3, set: setPriceP3, color: '#34d399' },
                 ].map(({ label, val, set, color }) => (
                   <div key={label} style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
                     <div style={{ width: 8, height: 8, borderRadius: 2, background: color, flexShrink: 0 }} />
@@ -456,27 +457,27 @@ export function ConfigForm({ profile, supplies: initialSupplies }: ConfigFormPro
 
           <div style={{ borderTop: tariffType === 'fixed' ? '1px solid var(--border-subtle)' : 'none', paddingTop: tariffType === 'fixed' ? 14 : 0 }}>
             <div style={{ fontSize: 11, color: 'var(--dim)', marginBottom: 10 }}>
-              Potencia contratada <span style={{ color: 'var(--dim2)' }}>(opcional — para calcular el término de potencia en la factura)</span>
+              {t('contractedPower')} <span style={{ color: 'var(--dim2)' }}>{t('contractedPowerNote')}</span>
             </div>
             <div className="g2" style={{ gap: 10 }}>
               <div>
-                <label style={LABEL}>Potencia (kW)</label>
-                <input style={{ ...INPUT, fontFamily: 'var(--font-mono)' }} value={powerKw} onChange={e => setPowerKw(e.target.value)} placeholder="4.6" type="number" step="0.1" min="0" />
+                <label style={LABEL}>{t('powerKw')}</label>
+                <input style={{ ...INPUT, fontFamily: 'var(--font-mono)' }} value={powerKw} onChange={e => setPowerKw(e.target.value)} placeholder={t('powerKwPlaceholder')} type="number" step="0.1" min="0" />
               </div>
               <div>
-                <label style={LABEL}>Precio (€/kW/mes)</label>
-                <input style={{ ...INPUT, fontFamily: 'var(--font-mono)' }} value={powerPriceKwMonth} onChange={e => setPowerPriceKwMonth(e.target.value)} placeholder="3.17" type="number" step="0.01" min="0" />
+                <label style={LABEL}>{t('powerPrice')}</label>
+                <input style={{ ...INPUT, fontFamily: 'var(--font-mono)' }} value={powerPriceKwMonth} onChange={e => setPowerPriceKwMonth(e.target.value)} placeholder={t('powerPricePlaceholder')} type="number" step="0.01" min="0" />
               </div>
             </div>
           </div>
 
           <div style={{ borderTop: '1px solid var(--border-subtle)', paddingTop: 14, marginTop: 4 }}>
             <div style={{ fontSize: 11, color: 'var(--dim)', marginBottom: 10 }}>
-              Objetivo mensual <span style={{ color: 'var(--dim2)' }}>(opcional — avisa si vas a superar el objetivo)</span>
+              {t('monthlyTarget')} <span style={{ color: 'var(--dim2)' }}>{t('monthlyTargetNote')}</span>
             </div>
             <div style={{ maxWidth: 160 }}>
-              <label style={LABEL}>Objetivo (kWh/mes)</label>
-              <input style={{ ...INPUT, fontFamily: 'var(--font-mono)' }} value={monthlyTarget} onChange={e => setMonthlyTarget(e.target.value)} placeholder="350" type="number" step="10" min="0" />
+              <label style={LABEL}>{t('monthlyTargetKwh')}</label>
+              <input style={{ ...INPUT, fontFamily: 'var(--font-mono)' }} value={monthlyTarget} onChange={e => setMonthlyTarget(e.target.value)} placeholder={t('monthlyTargetPlaceholder')} type="number" step="10" min="0" />
             </div>
           </div>
         </div>
@@ -484,7 +485,7 @@ export function ConfigForm({ profile, supplies: initialSupplies }: ConfigFormPro
         <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
           <button type="submit" style={BTN_PRIMARY} disabled={saving}>
             {saving && <Loader2 size={12} className="spin" />}
-            {saving ? 'Guardando...' : 'Guardar cambios'}
+            {saving ? t('saving') : t('save')}
           </button>
           {saveMsg && (
             <span style={{ fontSize: 12, color: saveMsg.ok ? '#34d399' : '#f87171', display: 'flex', alignItems: 'center', gap: 4 }}>
@@ -498,11 +499,11 @@ export function ConfigForm({ profile, supplies: initialSupplies }: ConfigFormPro
       {/* RIGHT: status + sync */}
       <div style={{ display: 'flex', flexDirection: 'column', gap: 12 }}>
         <div style={CARD}>
-          <div style={SECTION_LABEL}>Estado de sincronización</div>
+          <div style={SECTION_LABEL}>{t('syncStatus')}</div>
           {[
-            { label: 'Última sync', val: lastSync ?? 'Nunca', color: lastSync ? '#34d399' : 'var(--dim)' },
-            { label: 'Datos hasta', val: profile?.last_sync_at ? new Date(profile.last_sync_at).toLocaleString('es-ES', { day: 'numeric', month: 'short', hour: '2-digit', minute: '2-digit' }) : '—', color: 'var(--text-2)' },
-            { label: 'Próxima sync automática', val: 'Diaria a las 05:00', color: 'var(--dim)' },
+            { label: t('lastSync'), val: lastSync ?? tc('never'), color: lastSync ? '#34d399' : 'var(--dim)' },
+            { label: t('dataUpTo'), val: profile?.last_sync_at ? new Date(profile.last_sync_at).toLocaleString(undefined, { day: 'numeric', month: 'short', hour: '2-digit', minute: '2-digit' }) : '—', color: 'var(--text-2)' },
+            { label: t('nextAutoSync'), val: t('nextAutoSyncValue'), color: 'var(--dim)' },
           ].map(item => (
             <div key={item.label} style={{ display: 'flex', justifyContent: 'space-between', padding: '7px 0', borderBottom: '1px solid var(--border-subtle)' }}>
               <span style={{ fontSize: 12, color: 'var(--muted-c)' }}>{item.label}</span>
@@ -513,15 +514,14 @@ export function ConfigForm({ profile, supplies: initialSupplies }: ConfigFormPro
           <div style={{ display: 'flex', gap: 8, marginTop: 14, flexWrap: 'wrap' }}>
             <button style={BTN_DEFAULT} onClick={handleSyncDatadis} disabled={syncingDatadis} type="button">
               {syncingDatadis ? <Loader2 size={11} className="spin" /> : <RefreshCw size={11} />}
-              {syncingDatadis ? 'Sincronizando...' : 'Recargar Datadis'}
+              {syncingDatadis ? t('reloading') : t('reloadDatadis')}
             </button>
             <button style={BTN_DEFAULT} onClick={handleSyncPvpc} disabled={syncingPvpc} type="button">
               {syncingPvpc ? <Loader2 size={11} className="spin" /> : <Zap size={11} />}
-              {syncingPvpc ? 'Recargando...' : 'Recargar PVPC'}
+              {syncingPvpc ? t('reloadingPvpc') : t('reloadPvpc')}
             </button>
           </div>
 
-          {/* Log en tiempo real */}
           {syncLogs.length > 0 && (
             <div
               ref={logBoxRef}
@@ -551,7 +551,7 @@ export function ConfigForm({ profile, supplies: initialSupplies }: ConfigFormPro
               {(syncingDatadis || syncingPvpc) && (
                 <div style={{ color: 'var(--dim)', display: 'flex', gap: 7 }}>
                   <Loader2 size={10} className="spin" style={{ flexShrink: 0, marginTop: 2 }} />
-                  <span>Esperando respuesta...</span>
+                  <span>{t('waitingResponse')}</span>
                 </div>
               )}
             </div>
@@ -561,7 +561,7 @@ export function ConfigForm({ profile, supplies: initialSupplies }: ConfigFormPro
 
         {localSupplies.length > 0 && (
           <div style={CARD}>
-            <div style={SECTION_LABEL}>Suministros activos</div>
+            <div style={SECTION_LABEL}>{t('activeSupplies')}</div>
             <div style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
               {localSupplies.map(s => (
                 <div key={s.id} style={{
@@ -583,11 +583,11 @@ export function ConfigForm({ profile, supplies: initialSupplies }: ConfigFormPro
                     border: `1px solid ${s.is_active ? 'rgba(52,211,153,0.25)' : 'var(--btn-border)'}`,
                     fontFamily: 'var(--font-sans)',
                   }}>
-                    {s.is_active ? 'Activo' : 'Inactivo'}
+                    {s.is_active ? t('active') : t('inactive')}
                   </button>
                   <button type="button" onClick={() => handleDeleteSupply(s.id)} style={{
                     background: 'none', border: 'none', cursor: 'pointer', color: 'var(--dim)', fontSize: 14, lineHeight: 1, padding: '2px 4px', flexShrink: 0,
-                  }} title="Eliminar suministro">
+                  }} title={t('deleteSupply')}>
                     ×
                   </button>
                 </div>
@@ -597,21 +597,21 @@ export function ConfigForm({ profile, supplies: initialSupplies }: ConfigFormPro
         )}
 
         <div style={CARD}>
-          <div style={SECTION_LABEL}>Notificaciones de precio</div>
+          <div style={SECTION_LABEL}>{t('priceNotifications')}</div>
           <div style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
             <div>
-              <label style={LABEL}>Umbral PVPC (€/kWh)</label>
+              <label style={LABEL}>{t('pvpcThreshold')}</label>
               <input
                 style={{ ...INPUT, fontFamily: 'var(--font-mono)', maxWidth: 160 }}
                 value={pushThreshold}
                 onChange={e => setPushThreshold(e.target.value)}
-                placeholder="0.08000"
+                placeholder={t('pvpcThresholdPlaceholder')}
                 type="number"
                 step="0.001"
                 min="0"
               />
               <div style={{ fontSize: 10.5, color: 'var(--dim2)', marginTop: 4 }}>
-                Notificación cuando el precio baje de este valor.
+                {t('notificationDesc')}
               </div>
             </div>
             <div style={{ display: 'flex', alignItems: 'center', gap: 10, flexWrap: 'wrap' }}>
@@ -622,7 +622,7 @@ export function ConfigForm({ profile, supplies: initialSupplies }: ConfigFormPro
                 disabled={pushLoading}
               >
                 {pushLoading && <Loader2 size={12} className="spin" />}
-                {pushEnabled ? 'Desactivar notificaciones' : 'Activar notificaciones'}
+                {pushEnabled ? t('disableNotifications') : t('enableNotifications')}
               </button>
               {pushMsg && (
                 <span style={{ fontSize: 12, color: pushMsg.ok ? '#34d399' : '#f87171', display: 'flex', alignItems: 'center', gap: 4 }}>
@@ -633,7 +633,7 @@ export function ConfigForm({ profile, supplies: initialSupplies }: ConfigFormPro
             </div>
             {pushEnabled && !pushMsg && (
               <div style={{ fontSize: 11, color: '#34d399', display: 'flex', alignItems: 'center', gap: 4 }}>
-                <span>✓</span> Activo en este dispositivo
+                <span>✓</span> {t('notificationsActive')}
               </div>
             )}
           </div>
@@ -642,7 +642,7 @@ export function ConfigForm({ profile, supplies: initialSupplies }: ConfigFormPro
         <div style={{ padding: '12px 14px', borderRadius: 10, background: 'var(--status-bg)', border: '1px solid var(--status-border)', display: 'flex', gap: 8, alignItems: 'flex-start' }}>
           <Info size={13} color="var(--dim)" style={{ flexShrink: 0, marginTop: 1 }} />
           <p style={{ fontSize: 11, color: 'var(--dim2)', lineHeight: 1.65, margin: 0 }}>
-            Datadis puede tener hasta <strong style={{ color: 'var(--muted-c)' }}>2 días de retraso</strong> y limita a <strong style={{ color: 'var(--muted-c)' }}>~1 petición/día</strong> por endpoint. Si ves error 429, espera 24h. El cron automático se ejecuta a las <strong style={{ color: 'var(--muted-c)' }}>05:00</strong>.
+            {t('datadisNote')}
           </p>
         </div>
       </div>

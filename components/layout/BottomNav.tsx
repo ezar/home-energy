@@ -2,19 +2,22 @@
 
 import Link from 'next/link'
 import { usePathname } from 'next/navigation'
+import { useTranslations } from 'next-intl'
 import { Zap, BarChart3, DollarSign, TrendingUp, Settings, HelpCircle } from 'lucide-react'
-
-const navItems = [
-  { href: '/',             label: 'Resumen',  icon: Zap },
-  { href: '/consumption',  label: 'Consumo',  icon: BarChart3 },
-  { href: '/cost',         label: 'Coste',    icon: DollarSign },
-  { href: '/pvpc',         label: 'PVPC',     icon: TrendingUp },
-  { href: '/settings',     label: 'Config',   icon: Settings },
-  { href: '/help',         label: 'Ayuda',    icon: HelpCircle },
-]
 
 export function BottomNav() {
   const pathname = usePathname()
+  const t = useTranslations('Nav')
+
+  const navItems = [
+    { href: '/',             label: t('summary'),       icon: Zap },
+    { href: '/consumption',  label: t('consumption'),   icon: BarChart3 },
+    { href: '/cost',         label: t('cost'),          icon: DollarSign },
+    { href: '/pvpc',         label: t('pvpc'),          icon: TrendingUp },
+    { href: '/settings',     label: t('settingsShort'), icon: Settings },
+    { href: '/help',         label: t('help'),          icon: HelpCircle },
+  ]
+
   return (
     <nav className="bottom-nav">
       {navItems.map(({ href, label, icon: Icon }) => {

@@ -5,6 +5,7 @@ export const dynamic = 'force-dynamic'
 import { useState } from 'react'
 import { useRouter } from 'next/navigation'
 import Link from 'next/link'
+import { useTranslations } from 'next-intl'
 import { createClient } from '@/lib/supabase/client'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
@@ -14,6 +15,7 @@ import { Zap } from 'lucide-react'
 
 export default function LoginPage() {
   const router = useRouter()
+  const t = useTranslations('Login')
 
   const [email, setEmail] = useState('')
   const [password, setPassword] = useState('')
@@ -30,7 +32,7 @@ export default function LoginPage() {
 
     if (error) {
       setError(error.message === 'Invalid login credentials'
-        ? 'Email o contraseña incorrectos'
+        ? t('errorCredentials')
         : error.message
       )
       setLoading(false)
@@ -47,17 +49,17 @@ export default function LoginPage() {
         <div className="flex justify-center mb-2">
           <Zap className="h-8 w-8 text-yellow-400" />
         </div>
-        <CardTitle>Energy Dashboard</CardTitle>
-        <CardDescription>Consumo eléctrico del hogar</CardDescription>
+        <CardTitle>{t('appTitle')}</CardTitle>
+        <CardDescription>{t('tagline')}</CardDescription>
       </CardHeader>
       <CardContent>
         <form onSubmit={handleLogin} className="space-y-4">
           <div className="space-y-2">
-            <Label htmlFor="email">Email</Label>
+            <Label htmlFor="email">{t('email')}</Label>
             <Input
               id="email"
               type="email"
-              placeholder="tu@email.com"
+              placeholder={t('emailPlaceholder')}
               value={email}
               onChange={(e) => setEmail(e.target.value)}
               required
@@ -65,7 +67,7 @@ export default function LoginPage() {
             />
           </div>
           <div className="space-y-2">
-            <Label htmlFor="password">Contraseña</Label>
+            <Label htmlFor="password">{t('password')}</Label>
             <Input
               id="password"
               type="password"
@@ -79,15 +81,15 @@ export default function LoginPage() {
             <p className="text-sm text-destructive">{error}</p>
           )}
           <Button type="submit" className="w-full" disabled={loading}>
-            {loading ? 'Entrando...' : 'Entrar'}
+            {loading ? t('submitting') : t('submit')}
           </Button>
         </form>
       </CardContent>
       <CardFooter className="justify-center">
         <p className="text-sm text-muted-foreground">
-          ¿No tienes cuenta?{' '}
+          {t('noAccount')}{' '}
           <Link href="/register" className="text-primary underline-offset-4 hover:underline">
-            Regístrate
+            {t('registerLink')}
           </Link>
         </p>
       </CardFooter>

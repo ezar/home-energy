@@ -1,5 +1,6 @@
 import { createClient } from '@/lib/supabase/server'
 import { redirect } from 'next/navigation'
+import { getTranslations } from 'next-intl/server'
 import { Zap, DollarSign, TrendingUp, Clock } from 'lucide-react'
 import { startOfMonth, subMonths, format, subHours, startOfDay, addDays } from 'date-fns'
 import type { ConsumptionRow, PvpcPriceRow, ProfileRow, UserSupplyRow } from '@/lib/supabase/types-helper'
@@ -71,10 +72,14 @@ export default async function HomePage({ searchParams }: { searchParams: { cups?
   const pvpcToday = (pvpcTodayResult.data ?? []) as PvpcRow[]
   const supplies = (suppliesResult.data ?? []) as Pick<UserSupplyRow, 'cups' | 'display_name'>[]
 
+  const t = await getTranslations('Home')
+  const tp = await getTranslations('Period')
+  const tc = await getTranslations('Common')
+
   const tariffConfig = tariffConfigFromProfile(profile ?? {})
   const currentPeriod = getPeriod(now)
   const currentPeriodPrice = getEnergyPrice(currentPeriod, pvpcNow?.price_eur_kwh ?? null, tariffConfig)
-  const PERIOD_NAMES: Record<number, string> = { 1: 'P1 Punta', 2: 'P2 Llano', 3: 'P3 Valle' }
+  const PERIOD_NAMES: Record<number, string> = { 1: tp('1'), 2: tp('2'), 3: tp('3') }
   const PERIOD_COLORS: Record<number, string> = { 1: '#f87171', 2: '#fbbf24', 3: '#34d399' }
 
   const thisMonthKwh = thisMonthRows.reduce((s, r) => s + r.consumption_kwh, 0)
@@ -120,10 +125,10 @@ export default async function HomePage({ searchParams }: { searchParams: { cups?
 
   type Appliance = { name: string; duration: number; icon: string; color: string }
   const APPLIANCES: Appliance[] = [
-    { name: 'Lavadora', duration: 2, icon: '◎', color: '#60a5fa' },
-    { name: 'Lavavajillas', duration: 1, icon: '◈', color: '#34d399' },
-    { name: 'Horno', duration: 1, icon: '▣', color: '#fbbf24' },
-    { name: 'Carga VE', duration: 4, icon: '⏣', color: '#a78bfa' },
+    { name: t('appWasher'),     duration: 2, icon: '◎', color: '#60a5fa' },
+    { name: t('appDishwasher'), duration: 1, icon: '◈', color: '#34d399' },
+    { name: t('appOven'),       duration: 1, icon: '▣', color: '#fbbf24' },
+    { name: t('appEV'),         duration: 4, icon: '⏣', color: '#a78bfa' },
   ]
 
   const applianceSuggestions = upcomingPvpc.length > 0
@@ -140,7 +145,7 @@ export default async function HomePage({ searchParams }: { searchParams: { cups?
       <div className="g4">
         {/* Consumo */}
         <StatCard
-          label="Consumo mes"
+          label={t('consumptionMonth')}
           value={thisMonthKwh.toFixed(1)}
           unit="kWh"
           icon={<Zap size={14} color="#f59e0b" />}
@@ -162,18 +167,18 @@ export default async function HomePage({ searchParams }: { searchParams: { cups?
 
         {/* Coste */}
         <StatCard
-          label="Coste estimado"
+          label={t('estimatedCost')}
           value={estimatedCostEur !== null ? estimatedCostEur.toFixed(2) : '—'}
           unit="€"
           icon={<DollarSign size={14} color="#34d399" />}
           iconBg="rgba(52,211,153,0.1)"
           meta={
             <div>
-              <span style={{ fontSize: 11, color: 'var(--dim)' }}>Precio medio </span>
+              <span style={{ fontSize: 11, color: 'var(--dim)' }}>{t('avgPrice')} </span>
               <span style={{ fontSize: 11, color: 'var(--muted-c)', fontFamily: 'var(--font-mono)' }}>
                 {avgPvpc !== null ? avgPvpc.toFixed(5) : '—'} €/kWh
               </span>
-              <div style={{ fontSize: 10.5, color: 'var(--dim2)', fontStyle: 'italic', marginTop: 2 }}>Solo término de energía</div>
+              <div style={{ fontSize: 10.5, color: 'var(--dim2)', fontStyle: 'italic', marginTop: 2 }}>{t('energyOnly')}</div>
             </div>
           }
         />
@@ -181,13 +186,13 @@ export default async function HomePage({ searchParams }: { searchParams: { cups?
         {/* Precio ahora */}
         {(() => {
           const isFixed = tariffConfig.tariffType === 'fixed'
-          const priceLabel = isFixed ? 'Precio ahora' : 'PVPC ahora'
+          const priceLabel = isFixed ? t('priceNow') : t('pvpcNow')
           const priceVal = currentPeriodPrice > 0 ? currentPeriodPrice.toFixed(5) : '—'
           const periodColor = PERIOD_COLORS[currentPeriod]
           const cheapness = avgPvpc24h && pvpcNow
-            ? pvpcNow.price_eur_kwh < avgPvpc24h * 0.85 ? { label: 'barato', color: '#34d399' }
-            : pvpcNow.price_eur_kwh > avgPvpc24h * 1.15 ? { label: 'caro', color: '#f87171' }
-            : { label: 'normal', color: '#fbbf24' }
+            ? pvpcNow.price_eur_kwh < avgPvpc24h * 0.85 ? { label: t('cheap'), color: '#34d399' }
+            : pvpcNow.price_eur_kwh > avgPvpc24h * 1.15 ? { label: t('expensive'), color: '#f87171' }
+            : { label: t('normal'), color: '#fbbf24' }
             : null
           return (
             <StatCard
@@ -204,7 +209,7 @@ export default async function HomePage({ searchParams }: { searchParams: { cups?
                     {!isFixed && cheapness && (
                       <span style={{ fontSize: 10, color: cheapness.color, marginLeft: 2 }}>· {cheapness.label}</span>
                     )}
-                    {isFixed && <ColorBadge color="#60a5fa">Fija</ColorBadge>}
+                    {isFixed && <ColorBadge color="#60a5fa">{t('fixed')}</ColorBadge>}
                   </div>
                   {!isFixed && pvpcPrices24h.length > 0 && (
                     <div style={{ marginBottom: 4 }}>
@@ -225,8 +230,8 @@ export default async function HomePage({ searchParams }: { searchParams: { cups?
 
         {/* Último dato */}
         <StatCard
-          label="Último dato"
-          value={latestDatetime ? format(new Date(latestDatetime), 'dd MMM HH:mm') : 'Sin datos'}
+          label={t('lastData')}
+          value={latestDatetime ? format(new Date(latestDatetime), 'dd MMM HH:mm') : tc('noData')}
           icon={<Clock size={14} color="#38bdf8" />}
           iconBg="rgba(56,189,248,0.1)"
           meta={
@@ -259,7 +264,7 @@ export default async function HomePage({ searchParams }: { searchParams: { cups?
             <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: 10 }}>
               <div>
                 <div style={{ fontSize: 10.5, fontWeight: 600, color: 'var(--dim)', textTransform: 'uppercase', letterSpacing: '0.1em', marginBottom: 3 }}>
-                  Objetivo mensual
+                  {t('monthlyTarget')}
                 </div>
                 <div style={{ display: 'flex', alignItems: 'baseline', gap: 6 }}>
                   <span style={{ fontSize: 20, fontWeight: 700, color: barColor, fontFamily: 'var(--font-mono)' }}>{thisMonthKwh.toFixed(1)}</span>
@@ -269,7 +274,7 @@ export default async function HomePage({ searchParams }: { searchParams: { cups?
               </div>
               {willExceed && (
                 <div style={{ fontSize: 10.5, padding: '4px 10px', borderRadius: 6, background: 'rgba(248,113,113,0.12)', color: '#f87171', border: '1px solid rgba(248,113,113,0.25)', fontWeight: 500, flexShrink: 0 }}>
-                  Proyección: {projected.toFixed(0)} kWh
+                  {t('forecast', { value: projected.toFixed(0) })}
                 </div>
               )}
             </div>
@@ -281,7 +286,7 @@ export default async function HomePage({ searchParams }: { searchParams: { cups?
               }} />
             </div>
             <div style={{ fontSize: 10.5, color: 'var(--dim)', marginTop: 6 }}>
-              {daysElapsed}/{daysInMonth} días · {(target - thisMonthKwh).toFixed(1)} kWh restantes
+              {t('daysProgress', { elapsed: daysElapsed, total: daysInMonth, remaining: (target - thisMonthKwh).toFixed(1) })}
             </div>
           </div>
         )
@@ -295,10 +300,10 @@ export default async function HomePage({ searchParams }: { searchParams: { cups?
         }}>
           <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 12 }}>
             <div style={{ fontSize: 10.5, fontWeight: 600, color: 'var(--dim)', textTransform: 'uppercase', letterSpacing: '0.1em' }}>
-              Mejor hora hoy
+              {t('bestHourToday')}
             </div>
             <div style={{ fontSize: 10.5, color: 'var(--dim2)' }}>
-              {upcomingPvpc.length} horas disponibles · {format(now, 'dd MMM')}
+              {t('hoursAvailable', { count: upcomingPvpc.length, date: format(now, 'dd MMM') })}
             </div>
           </div>
           <div style={{ display: 'flex', gap: 10, flexWrap: 'wrap' }}>
@@ -307,7 +312,7 @@ export default async function HomePage({ searchParams }: { searchParams: { cups?
               const hoursDiff = Math.round((dt.getTime() - now.getTime()) / 3600000)
               const isNow = hoursDiff === 0
               const isTomorrow = dt.toDateString() !== now.toDateString()
-              const timeLabel = isNow ? 'ahora' : isTomorrow ? 'mañana' : `en ${hoursDiff}h`
+              const timeLabel = isNow ? t('timeNow') : isTomorrow ? t('timeTomorrow') : t('timeInHours', { hours: hoursDiff })
               const period = getPeriod(dt)
               const pColor = PERIOD_COLORS[period]
               return (
@@ -345,7 +350,7 @@ export default async function HomePage({ searchParams }: { searchParams: { cups?
           borderRadius: 12, padding: '14px 18px', boxShadow: 'var(--shadow-card)',
         }}>
           <div style={{ fontSize: 10.5, fontWeight: 600, color: 'var(--dim)', textTransform: 'uppercase', letterSpacing: '0.1em', marginBottom: 12 }}>
-            Sugerencias de carga
+            {t('chargeSuggestions')}
           </div>
           <div style={{ display: 'flex', gap: 10, flexWrap: 'wrap' }}>
             {applianceSuggestions.map((s) => {
@@ -369,14 +374,14 @@ export default async function HomePage({ searchParams }: { searchParams: { cups?
                     {s.avgPrice.toFixed(5)} €/kWh
                   </div>
                   <div style={{ fontSize: 10, color: 'var(--dim2)' }}>
-                    {isTomorrow ? 'mañana' : hoursUntil <= 0 ? 'ahora mismo' : `en ${hoursUntil}h`}
+                    {isTomorrow ? t('timeTomorrow') : hoursUntil <= 0 ? t('timeNowImmediately') : t('timeInHours', { hours: hoursUntil })}
                   </div>
                 </div>
               )
             })}
           </div>
           <div style={{ fontSize: 10, color: 'var(--dim2)', marginTop: 10 }}>
-            Ventana más barata en precio medio para cada electrodoméstico
+            {t('chargeNote')}
           </div>
         </div>
       )}
@@ -389,13 +394,13 @@ export default async function HomePage({ searchParams }: { searchParams: { cups?
         }}>
           <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 14 }}>
             <div style={{ fontSize: 10.5, fontWeight: 600, color: 'var(--dim)', textTransform: 'uppercase', letterSpacing: '0.1em' }}>
-              Precio PVPC · Últimas 24 horas
+              {t('pvpc24h')}
             </div>
             <div style={{ display: 'flex', gap: 16 }}>
               {[
-                { label: 'Mín', val: minPvpc?.toFixed(4), color: '#34d399' },
-                { label: 'Máx', val: maxPvpc?.toFixed(4), color: '#f87171' },
-                { label: 'Media', val: avgPvpc24h?.toFixed(4), color: '#a78bfa' },
+                { label: t('min'), val: minPvpc?.toFixed(4), color: '#34d399' },
+                { label: t('max'), val: maxPvpc?.toFixed(4), color: '#f87171' },
+                { label: t('avg'), val: avgPvpc24h?.toFixed(4), color: '#a78bfa' },
               ].map(s => (
                 <div key={s.label} style={{ textAlign: 'right' }}>
                   <div style={{ fontSize: 9.5, color: 'var(--dim)' }}>{s.label}</div>

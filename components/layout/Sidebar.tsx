@@ -2,16 +2,8 @@
 
 import Link from 'next/link'
 import { usePathname } from 'next/navigation'
+import { useTranslations } from 'next-intl'
 import { Zap, BarChart3, DollarSign, TrendingUp, Settings, HelpCircle } from 'lucide-react'
-
-const navItems = [
-  { href: '/',             label: 'Resumen',       icon: Zap },
-  { href: '/consumption',  label: 'Consumo',       icon: BarChart3 },
-  { href: '/cost',         label: 'Coste',         icon: DollarSign },
-  { href: '/pvpc',         label: 'PVPC',          icon: TrendingUp },
-  { href: '/settings',     label: 'Configuración', icon: Settings },
-  { href: '/help',         label: 'Ayuda',         icon: HelpCircle },
-]
 
 interface SidebarProps {
   lastSyncAt: string | null
@@ -20,8 +12,19 @@ interface SidebarProps {
 
 export function Sidebar({ lastSyncAt, syncing }: SidebarProps) {
   const pathname = usePathname()
+  const t = useTranslations('Nav')
+  const ts = useTranslations('Sidebar')
 
-  const syncLabel = syncing ? 'Sincronizando' : lastSyncAt ? 'Sincronizado' : 'Sin sync'
+  const navItems = [
+    { href: '/',             label: t('summary'),         icon: Zap },
+    { href: '/consumption',  label: t('consumption'),     icon: BarChart3 },
+    { href: '/cost',         label: t('cost'),            icon: DollarSign },
+    { href: '/pvpc',         label: t('pvpc'),            icon: TrendingUp },
+    { href: '/settings',     label: t('settings'),        icon: Settings },
+    { href: '/help',         label: t('help'),            icon: HelpCircle },
+  ]
+
+  const syncLabel = syncing ? ts('syncing') : lastSyncAt ? ts('synced') : ts('noSync')
   const syncColor = syncing ? '#fbbf24' : lastSyncAt ? '#34d399' : '#888892'
 
   return (
@@ -49,7 +52,7 @@ export function Sidebar({ lastSyncAt, syncing }: SidebarProps) {
           <Zap size={14} color="#f59e0b" fill="rgba(245,158,11,0.2)" />
         </div>
         <span style={{ fontSize: 13, fontWeight: 600, color: 'var(--nav-active-text)', letterSpacing: '0.02em' }}>
-          Energy
+          {ts('logo')}
         </span>
       </div>
 
@@ -96,7 +99,7 @@ export function Sidebar({ lastSyncAt, syncing }: SidebarProps) {
         <div style={{ fontSize: 10, color: 'var(--dim2)' }}>
           {lastSyncAt
             ? new Date(lastSyncAt).toLocaleString('es-ES', { day: 'numeric', month: 'short', hour: '2-digit', minute: '2-digit' })
-            : 'Nunca'}
+            : ts('noSync')}
         </div>
       </div>
 
