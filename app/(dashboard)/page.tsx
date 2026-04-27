@@ -1,7 +1,8 @@
 import { createClient } from '@/lib/supabase/server'
 import { Zap, DollarSign, TrendingUp, Clock } from 'lucide-react'
 import { startOfMonth, subMonths, format, subHours, startOfDay, addDays } from 'date-fns'
-import type { ConsumptionRow, PvpcPriceRow, ProfileRow } from '@/lib/supabase/types-helper'
+import type { ConsumptionRow, PvpcPriceRow, ProfileRow, UserSupplyRow } from '@/lib/supabase/types-helper'
+import { CupsSelector } from '@/components/dashboard/CupsSelector'
 import { StatCard } from '@/components/dashboard/StatCard'
 import { ColorBadge } from '@/components/dashboard/PeriodBadge'
 import { PvpcBarChart } from '@/components/charts/PvpcBarChart'
@@ -11,11 +12,12 @@ import { getPeriod } from '@/lib/tariff'
 
 export const dynamic = 'force-dynamic'
 
-export default async function HomePage() {
+export default async function HomePage({ searchParams }: { searchParams: { cups?: string } }) {
   const supabase = await createClient()
   const { data: { user } } = await supabase.auth.getUser()
   if (!user) return null
 
+  const selectedCups = searchParams.cups ?? null
   const now = new Date()
   const startThisMonth = startOfMonth(now).toISOString()
   const startLastMonth = startOfMonth(subMonths(now, 1)).toISOString()
@@ -24,15 +26,25 @@ export default async function HomePage() {
   const startToday = startOfDay(now).toISOString()
   const endTomorrow = startOfDay(addDays(now, 2)).toISOString()
 
-  const [profileResult, thisMonthResult, lastMonthResult, latestResult, pvpcNowResult, pvpc24hResult, pvpcTodayResult] =
+  let qThisMonth = supabase.from('consumption').select('consumption_kwh').eq('user_id', user.id).gte('datetime', startThisMonth)
+  if (selectedCups) qThisMonth = qThisMonth.eq('cups', selectedCups)
+
+  let qLastMonth = supabase.from('consumption').select('consumption_kwh').eq('user_id', user.id).gte('datetime', startLastMonth).lt('datetime', endLastMonth)
+  if (selectedCups) qLastMonth = qLastMonth.eq('cups', selectedCups)
+
+  let qLatest = supabase.from('consumption').select('datetime').eq('user_id', user.id).order('datetime', { ascending: false }).limit(1)
+  if (selectedCups) qLatest = qLatest.eq('cups', selectedCups)
+
+  const [profileResult, thisMonthResult, lastMonthResult, latestResult, pvpcNowResult, pvpc24hResult, pvpcTodayResult, suppliesResult] =
     await Promise.all([
       supabase.from('profiles').select('last_sync_at, cups, distributor_code, tariff_type, price_p1_eur_kwh, price_p2_eur_kwh, price_p3_eur_kwh, power_kw, power_price_eur_kw_month, monthly_kwh_target').eq('id', user.id).single(),
-      supabase.from('consumption').select('consumption_kwh').eq('user_id', user.id).gte('datetime', startThisMonth),
-      supabase.from('consumption').select('consumption_kwh').eq('user_id', user.id).gte('datetime', startLastMonth).lt('datetime', endLastMonth),
-      supabase.from('consumption').select('datetime').eq('user_id', user.id).order('datetime', { ascending: false }).limit(1),
+      qThisMonth,
+      qLastMonth,
+      qLatest,
       supabase.from('pvpc_prices').select('price_eur_kwh, datetime').order('datetime', { ascending: false }).limit(1),
       supabase.from('pvpc_prices').select('price_eur_kwh, datetime').gte('datetime', start24h).order('datetime', { ascending: true }),
       supabase.from('pvpc_prices').select('price_eur_kwh, datetime').gte('datetime', startToday).lt('datetime', endTomorrow).order('datetime', { ascending: true }),
+      supabase.from('user_supplies').select('cups, display_name').eq('user_id', user.id).eq('is_active', true),
     ])
 
   type MonthRow = Pick<ConsumptionRow, 'consumption_kwh'>
@@ -46,6 +58,7 @@ export default async function HomePage() {
   const pvpcNow = ((pvpcNowResult.data ?? []) as PvpcRow[])[0] ?? null
   const pvpc24h = (pvpc24hResult.data ?? []) as PvpcRow[]
   const pvpcToday = (pvpcTodayResult.data ?? []) as PvpcRow[]
+  const supplies = (suppliesResult.data ?? []) as Pick<UserSupplyRow, 'cups' | 'display_name'>[]
 
   const tariffConfig = tariffConfigFromProfile(profile ?? {})
   const currentPeriod = getPeriod(now)
@@ -111,6 +124,7 @@ export default async function HomePage() {
 
   return (
     <div style={{ display: 'flex', flexDirection: 'column', gap: 12 }}>
+      {supplies.length > 1 && <CupsSelector supplies={supplies} selected={selectedCups} />}
       {/* Stat cards */}
       <div className="g4">
         {/* Consumo */}

@@ -1,22 +1,33 @@
 import { createClient } from '@/lib/supabase/server'
 import { PvpcView } from './PvpcView'
+import { CupsSelector } from '@/components/dashboard/CupsSelector'
 import { subDays, startOfDay, format } from 'date-fns'
 import type { ChartDataPoint, TariffPeriod } from '@/lib/types/consumption'
-import type { ConsumptionRow, PvpcPriceRow } from '@/lib/supabase/types-helper'
+import type { ConsumptionRow, PvpcPriceRow, UserSupplyRow } from '@/lib/supabase/types-helper'
 
 export const dynamic = 'force-dynamic'
 
-export default async function PvpcPage() {
+export default async function PvpcPage({ searchParams }: { searchParams: { cups?: string } }) {
   const supabase = await createClient()
   const { data: { user } } = await supabase.auth.getUser()
   if (!user) return null
 
+  const selectedCups = searchParams.cups ?? null
   const now = new Date()
   const from = startOfDay(subDays(now, 30)).toISOString()
 
-  const [consumptionResult, pvpcResult] = await Promise.all([
-    supabase.from('consumption').select('datetime, consumption_kwh, period').eq('user_id', user.id).gte('datetime', from).order('datetime', { ascending: true }),
+  let consumptionQ = supabase
+    .from('consumption')
+    .select('datetime, consumption_kwh, period')
+    .eq('user_id', user.id)
+    .gte('datetime', from)
+    .order('datetime', { ascending: true })
+  if (selectedCups) consumptionQ = consumptionQ.eq('cups', selectedCups)
+
+  const [consumptionResult, pvpcResult, suppliesResult] = await Promise.all([
+    consumptionQ,
     supabase.from('pvpc_prices').select('datetime, price_eur_kwh').gte('datetime', from).order('datetime', { ascending: true }),
+    supabase.from('user_supplies').select('cups, display_name').eq('user_id', user.id).eq('is_active', true),
   ])
 
   type HourlyRow = Pick<ConsumptionRow, 'datetime' | 'consumption_kwh' | 'period'>
@@ -24,6 +35,7 @@ export default async function PvpcPage() {
 
   const consumptionRows = (consumptionResult.data ?? []) as HourlyRow[]
   const pvpcRows = (pvpcResult.data ?? []) as PvpcRow[]
+  const supplies = (suppliesResult.data ?? []) as Pick<UserSupplyRow, 'cups' | 'display_name'>[]
   const pvpcMap = new Map(pvpcRows.map((p) => [p.datetime, p.price_eur_kwh]))
 
   const data: ChartDataPoint[] = consumptionRows.map((r) => {
@@ -56,6 +68,7 @@ export default async function PvpcPage() {
         <h1 className="text-2xl font-bold">Comparativa PVPC</h1>
         <p className="text-sm text-muted-foreground mt-1">Consumo real vs precio de mercado — últimos 30 días</p>
       </div>
+      {supplies.length > 1 && <CupsSelector supplies={supplies} selected={selectedCups} />}
       <PvpcView data={data} avgPricePaid={avgPricePaid} avgMarketPrice={avgMarketPrice} />
     </div>
   )

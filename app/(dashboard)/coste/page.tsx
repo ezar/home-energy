@@ -1,9 +1,10 @@
 import { createClient } from '@/lib/supabase/server'
 import { CostLineChart } from '@/components/charts/CostLineChart'
 import { TariffSimulator } from './TariffSimulator'
+import { CupsSelector } from '@/components/dashboard/CupsSelector'
 import { startOfMonth, subMonths, format, getDate, getDaysInMonth } from 'date-fns'
 import { es } from 'date-fns/locale'
-import type { ConsumptionRow, PvpcPriceRow, ProfileRow, MaximeterRow } from '@/lib/supabase/types-helper'
+import type { ConsumptionRow, PvpcPriceRow, ProfileRow, MaximeterRow, UserSupplyRow } from '@/lib/supabase/types-helper'
 import {
   tariffConfigFromProfile, getEnergyPrice,
   monthlyPowerCost, applyTaxes, VAT_RATE, ELECTRICITY_TAX_RATE,
@@ -19,30 +20,33 @@ const CARD = {
   borderRadius: 12, padding: '16px 18px', boxShadow: 'var(--shadow-card)',
 }
 
-export default async function CostePage() {
+export default async function CostePage({ searchParams }: { searchParams: { cups?: string } }) {
   const supabase = await createClient()
   const { data: { user } } = await supabase.auth.getUser()
   if (!user) return null
 
+  const selectedCups = searchParams.cups ?? null
   const now = new Date()
 
-  const [profileResult, maximeterResult] = await Promise.all([
+  const [profileResult, maximeterResult, suppliesResult] = await Promise.all([
     supabase
       .from('profiles')
       .select('tariff_type, price_p1_eur_kwh, price_p2_eur_kwh, price_p3_eur_kwh, power_kw, power_price_eur_kw_month')
       .eq('id', user.id)
       .single(),
-    supabase
-      .from('maximeter')
-      .select('datetime, max_power_kw, period')
-      .eq('user_id', user.id)
-      .gte('datetime', startOfMonth(now).toISOString())
-      .order('max_power_kw', { ascending: false })
-      .limit(10),
+    (() => {
+      let q = supabase.from('maximeter').select('datetime, max_power_kw, period')
+        .eq('user_id', user.id).gte('datetime', startOfMonth(now).toISOString())
+        .order('max_power_kw', { ascending: false }).limit(10)
+      if (selectedCups) q = q.eq('cups', selectedCups)
+      return q
+    })(),
+    supabase.from('user_supplies').select('cups, display_name').eq('user_id', user.id).eq('is_active', true),
   ])
 
   type MaxRow = Pick<MaximeterRow, 'datetime' | 'max_power_kw' | 'period'>
   const maximeterRows = (maximeterResult.data ?? []) as MaxRow[]
+  const supplies = (suppliesResult.data ?? []) as Pick<UserSupplyRow, 'cups' | 'display_name'>[]
 
   const tariffConfig = tariffConfigFromProfile(
     (profileResult.data ?? {}) as Pick<ProfileRow,
@@ -65,8 +69,12 @@ export default async function CostePage() {
 
   const monthlyStats = await Promise.all(
     months.map(async ({ label, shortLabel, start, end, isCurrentMonth }) => {
+      let consumptionQ = supabase.from('consumption').select('consumption_kwh, period, datetime')
+        .eq('user_id', user.id).gte('datetime', start).lt('datetime', end)
+      if (selectedCups) consumptionQ = consumptionQ.eq('cups', selectedCups)
+
       const queries: [Promise<{ data: CRow[] | null }>, Promise<{ data: PRow[] | null }>] = [
-        supabase.from('consumption').select('consumption_kwh, period, datetime').eq('user_id', user.id).gte('datetime', start).lt('datetime', end) as unknown as Promise<{ data: CRow[] | null }>,
+        consumptionQ as unknown as Promise<{ data: CRow[] | null }>,
         supabase.from('pvpc_prices').select('datetime, price_eur_kwh').gte('datetime', start).lt('datetime', end) as unknown as Promise<{ data: PRow[] | null }>,
       ]
       const [{ data: consumptionRaw }, { data: pvpcRaw }] = await Promise.all(queries)
@@ -133,6 +141,7 @@ export default async function CostePage() {
 
   return (
     <div style={{ display: 'flex', flexDirection: 'column', gap: 12 }}>
+      {supplies.length > 1 && <CupsSelector supplies={supplies} selected={selectedCups} />}
       {/* Top stats */}
       <div className="g3">
         {[

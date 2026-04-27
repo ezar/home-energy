@@ -1,48 +1,47 @@
 import { createClient } from '@/lib/supabase/server'
 import { ConsumptionView } from './ConsumptionView'
+import { CupsSelector } from '@/components/dashboard/CupsSelector'
 import { format, startOfMonth, subMonths, getDay } from 'date-fns'
 import type { ChartDataPoint, DailySummary, MonthlySummary, TariffPeriod } from '@/lib/types/consumption'
-import type { ConsumptionRow, PvpcPriceRow } from '@/lib/supabase/types-helper'
+import type { ConsumptionRow, PvpcPriceRow, UserSupplyRow } from '@/lib/supabase/types-helper'
 import { subDays, startOfDay } from 'date-fns'
 
 export const dynamic = 'force-dynamic'
 
-export default async function ConsumoPage() {
+export default async function ConsumoPage({ searchParams }: { searchParams: { cups?: string } }) {
   const supabase = await createClient()
   const { data: { user } } = await supabase.auth.getUser()
   if (!user) return null
 
+  const selectedCups = searchParams.cups ?? null
   const now = new Date()
   const today = startOfDay(now)
 
-  const [hourlyResult, pvpcResult, dailyRawResult, monthlyRawResult] = await Promise.all([
-    supabase
-      .from('consumption')
-      .select('datetime, consumption_kwh, period')
-      .eq('user_id', user.id)
-      .gte('datetime', subDays(today, 30).toISOString())
-      .order('datetime', { ascending: true }),
+  let hourlyQ = supabase
+    .from('consumption').select('datetime, consumption_kwh, period')
+    .eq('user_id', user.id).gte('datetime', subDays(today, 30).toISOString())
+    .order('datetime', { ascending: true })
+  if (selectedCups) hourlyQ = hourlyQ.eq('cups', selectedCups)
 
-    // PVPC cubre 90 días para que los costes del diario sean correctos en todos los rangos
-    supabase
-      .from('pvpc_prices')
-      .select('datetime, price_eur_kwh')
-      .gte('datetime', subDays(today, 90).toISOString())
-      .order('datetime', { ascending: true }),
+  let dailyQ = supabase
+    .from('consumption').select('datetime, consumption_kwh, period')
+    .eq('user_id', user.id).gte('datetime', subDays(today, 90).toISOString())
+    .order('datetime', { ascending: true })
+  if (selectedCups) dailyQ = dailyQ.eq('cups', selectedCups)
 
-    supabase
-      .from('consumption')
-      .select('datetime, consumption_kwh, period')
-      .eq('user_id', user.id)
-      .gte('datetime', subDays(today, 90).toISOString())
-      .order('datetime', { ascending: true }),
+  let monthlyQ = supabase
+    .from('consumption').select('datetime, consumption_kwh')
+    .eq('user_id', user.id).gte('datetime', startOfMonth(subMonths(now, 23)).toISOString())
+    .order('datetime', { ascending: true })
+  if (selectedCups) monthlyQ = monthlyQ.eq('cups', selectedCups)
 
-    supabase
-      .from('consumption')
-      .select('datetime, consumption_kwh')
-      .eq('user_id', user.id)
-      .gte('datetime', startOfMonth(subMonths(now, 23)).toISOString())
-      .order('datetime', { ascending: true }),
+  const [hourlyResult, pvpcResult, dailyRawResult, monthlyRawResult, suppliesResult] = await Promise.all([
+    hourlyQ,
+    supabase.from('pvpc_prices').select('datetime, price_eur_kwh')
+      .gte('datetime', subDays(today, 90).toISOString()).order('datetime', { ascending: true }),
+    dailyQ,
+    monthlyQ,
+    supabase.from('user_supplies').select('cups, display_name').eq('user_id', user.id).eq('is_active', true),
   ])
 
   type HourlyRow = Pick<ConsumptionRow, 'datetime' | 'consumption_kwh' | 'period'>
@@ -53,6 +52,7 @@ export default async function ConsumoPage() {
   const pvpcRows = (pvpcResult.data ?? []) as PvpcRow[]
   const dailyRows = (dailyRawResult.data ?? []) as HourlyRow[]
   const monthlyRows = (monthlyRawResult.data ?? []) as MonthlyRow[]
+  const supplies = (suppliesResult.data ?? []) as Pick<UserSupplyRow, 'cups' | 'display_name'>[]
 
   const pvpcMap = new Map<string, number>(pvpcRows.map((p) => [p.datetime, p.price_eur_kwh]))
 
@@ -86,10 +86,9 @@ export default async function ConsumoPage() {
     .sort(([a], [b]) => a.localeCompare(b))
     .map(([date, vals]) => ({ date, ...vals }))
 
-  // Compute rolling avg per weekday (last 8 same-weekday occurrences, excluding the day itself)
   const weekdayAvgs = new Map<string, number>()
   for (const entry of rawDailyData) {
-    const dow = getDay(new Date(entry.date)) // 0=Sun...6=Sat
+    const dow = getDay(new Date(entry.date))
     const sameWeekdayBefore = rawDailyData
       .filter(d => d.date < entry.date && getDay(new Date(d.date)) === dow)
       .slice(-8)
@@ -129,6 +128,7 @@ export default async function ConsumoPage() {
         <h1 className="text-2xl font-bold">Consumo</h1>
         <p className="text-sm text-muted-foreground mt-1">Análisis horario, diario y mensual</p>
       </div>
+      {supplies.length > 1 && <CupsSelector supplies={supplies} selected={selectedCups} />}
       <ConsumptionView hourlyData={hourlyData} dailyData={dailyData} monthlyData={monthlyData} />
     </div>
   )
