@@ -12,7 +12,7 @@ export default async function PvpcPage() {
   if (!user) return null
 
   const now = new Date()
-  const from = startOfDay(subDays(now, 7)).toISOString()
+  const from = startOfDay(subDays(now, 30)).toISOString()
 
   const [consumptionResult, pvpcResult] = await Promise.all([
     supabase.from('consumption').select('datetime, consumption_kwh, period').eq('user_id', user.id).gte('datetime', from).order('datetime', { ascending: true }),
@@ -54,7 +54,7 @@ export default async function PvpcPage() {
     <div className="p-6 space-y-6">
       <div>
         <h1 className="text-2xl font-bold">Comparativa PVPC</h1>
-        <p className="text-sm text-muted-foreground mt-1">Consumo real vs precio de mercado — últimos 7 días</p>
+        <p className="text-sm text-muted-foreground mt-1">Consumo real vs precio de mercado — últimos 30 días</p>
       </div>
       <PvpcView data={data} avgPricePaid={avgPricePaid} avgMarketPrice={avgMarketPrice} />
     </div>

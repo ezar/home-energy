@@ -48,6 +48,8 @@ export interface DailySummary {
   kwhP1: number
   kwhP2: number
   kwhP3: number
+  isAnomalous?: boolean
+  avgForWeekday?: number
 }
 
 // Resumen por mes

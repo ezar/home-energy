@@ -1,5 +1,6 @@
 import { createClient } from '@/lib/supabase/server'
 import { CostLineChart } from '@/components/charts/CostLineChart'
+import { TariffSimulator } from './TariffSimulator'
 import { startOfMonth, subMonths, format, getDate, getDaysInMonth } from 'date-fns'
 import { es } from 'date-fns/locale'
 import type { ConsumptionRow, PvpcPriceRow, ProfileRow } from '@/lib/supabase/types-helper'
@@ -279,6 +280,20 @@ export default async function CostePage() {
           </div>
         )
       })()}
+
+      {/* Calculadora de cambio de tarifa */}
+      <TariffSimulator
+        months={monthlyStats.map(m => ({
+          label: m.label,
+          p1Kwh: m.p1Kwh,
+          p2Kwh: m.p2Kwh,
+          p3Kwh: m.p3Kwh,
+          actualCost: m.totalCost,
+        }))}
+        currentP1={tariffConfig.tariffType === 'fixed' ? tariffConfig.priceP1 : null}
+        currentP2={tariffConfig.tariffType === 'fixed' ? tariffConfig.priceP2 : null}
+        currentP3={tariffConfig.tariffType === 'fixed' ? tariffConfig.priceP3 : null}
+      />
 
       {/* Chart + history */}
       <div className="g2">

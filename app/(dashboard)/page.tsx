@@ -75,6 +75,40 @@ export default async function HomePage() {
   const upcomingPvpc = pvpcToday.filter(p => new Date(p.datetime) >= nowRounded)
   const bestHoursToday = [...upcomingPvpc].sort((a, b) => a.price_eur_kwh - b.price_eur_kwh).slice(0, 3)
 
+  // Find best consecutive window of given duration in upcoming hours
+  function findBestWindow(hours: PvpcRow[], duration: number): { start: Date; avgPrice: number } | null {
+    if (hours.length < duration) return null
+    let bestAvg = Infinity
+    let bestStart: Date | null = null
+    for (let i = 0; i <= hours.length - duration; i++) {
+      const window = hours.slice(i, i + duration)
+      let consecutive = true
+      for (let j = 1; j < window.length; j++) {
+        const diff = (new Date(window[j].datetime).getTime() - new Date(window[j - 1].datetime).getTime()) / 3600000
+        if (Math.abs(diff - 1) > 0.1) { consecutive = false; break }
+      }
+      if (!consecutive) continue
+      const avg = window.reduce((s, h) => s + h.price_eur_kwh, 0) / duration
+      if (avg < bestAvg) { bestAvg = avg; bestStart = new Date(window[0].datetime) }
+    }
+    return bestStart ? { start: bestStart, avgPrice: bestAvg } : null
+  }
+
+  type Appliance = { name: string; duration: number; icon: string; color: string }
+  const APPLIANCES: Appliance[] = [
+    { name: 'Lavadora', duration: 2, icon: '◎', color: '#60a5fa' },
+    { name: 'Lavavajillas', duration: 1, icon: '◈', color: '#34d399' },
+    { name: 'Horno', duration: 1, icon: '▣', color: '#fbbf24' },
+    { name: 'Carga VE', duration: 4, icon: '⏣', color: '#a78bfa' },
+  ]
+
+  const applianceSuggestions = upcomingPvpc.length > 0
+    ? APPLIANCES.map(a => {
+        const win = findBestWindow(upcomingPvpc, a.duration)
+        return win ? { ...a, ...win } : null
+      }).filter((s): s is Appliance & { start: Date; avgPrice: number } => s !== null)
+    : []
+
   return (
     <div style={{ display: 'flex', flexDirection: 'column', gap: 12 }}>
       {/* Stat cards */}
@@ -275,6 +309,49 @@ export default async function HomePage() {
                 </div>
               )
             })}
+          </div>
+        </div>
+      )}
+
+      {/* Sugerencias de carga */}
+      {applianceSuggestions.length > 0 && (
+        <div style={{
+          background: 'var(--card-grad)', border: '1px solid var(--border-c)',
+          borderRadius: 12, padding: '14px 18px', boxShadow: 'var(--shadow-card)',
+        }}>
+          <div style={{ fontSize: 10.5, fontWeight: 600, color: 'var(--dim)', textTransform: 'uppercase', letterSpacing: '0.1em', marginBottom: 12 }}>
+            Sugerencias de carga
+          </div>
+          <div style={{ display: 'flex', gap: 10, flexWrap: 'wrap' }}>
+            {applianceSuggestions.map((s) => {
+              const endHour = new Date(s.start.getTime() + s.duration * 3600000)
+              const isTomorrow = s.start.toDateString() !== now.toDateString()
+              const hoursUntil = Math.round((s.start.getTime() - now.getTime()) / 3600000)
+              return (
+                <div key={s.name} style={{
+                  flex: '1 1 140px', padding: '10px 12px', borderRadius: 8,
+                  background: `rgba(${s.color === '#60a5fa' ? '96,165,250' : s.color === '#34d399' ? '52,211,153' : s.color === '#fbbf24' ? '251,191,36' : '167,139,250'},0.06)`,
+                  border: `1px solid ${s.color}30`,
+                }}>
+                  <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 5 }}>
+                    <span style={{ fontSize: 12, fontWeight: 600, color: s.color }}>{s.name}</span>
+                    <span style={{ fontSize: 9.5, color: 'var(--dim)' }}>{s.duration}h</span>
+                  </div>
+                  <div style={{ fontFamily: 'var(--font-mono)', fontSize: 13, fontWeight: 700, color: 'var(--text)', marginBottom: 3 }}>
+                    {String(s.start.getHours()).padStart(2, '0')}:00–{String(endHour.getHours()).padStart(2, '0')}:00
+                  </div>
+                  <div style={{ fontSize: 11, color: '#34d399', fontFamily: 'var(--font-mono)', marginBottom: 3 }}>
+                    {s.avgPrice.toFixed(5)} €/kWh
+                  </div>
+                  <div style={{ fontSize: 10, color: 'var(--dim2)' }}>
+                    {isTomorrow ? 'mañana' : hoursUntil <= 0 ? 'ahora mismo' : `en ${hoursUntil}h`}
+                  </div>
+                </div>
+              )
+            })}
+          </div>
+          <div style={{ fontSize: 10, color: 'var(--dim2)', marginTop: 10 }}>
+            Ventana más barata en precio medio para cada electrodoméstico
           </div>
         </div>
       )}

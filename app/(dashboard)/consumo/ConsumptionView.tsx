@@ -86,6 +86,7 @@ export function ConsumptionView({ hourlyData, dailyData, monthlyData }: Props) {
 
   const dailyTotal = filteredDaily.reduce((s, d) => s + d.totalKwh, 0)
   const dailyMax = filteredDaily.length ? Math.max(...filteredDaily.map(d => d.totalKwh)) : 0
+  const anomalyCount = filteredDaily.filter(d => d.isAnomalous).length
 
   const recent12 = useMemo(() => monthlyData.slice(-12), [monthlyData])
 
@@ -221,8 +222,15 @@ export function ConsumptionView({ hourlyData, dailyData, monthlyData }: Props) {
         {view === 'diaria' && (
           <>
             <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 12 }}>
-              <div style={{ fontSize: 10.5, fontWeight: 600, color: 'var(--dim)', textTransform: 'uppercase', letterSpacing: '0.1em' }}>
-                Consumo diario
+              <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+                <div style={{ fontSize: 10.5, fontWeight: 600, color: 'var(--dim)', textTransform: 'uppercase', letterSpacing: '0.1em' }}>
+                  Consumo diario
+                </div>
+                {anomalyCount > 0 && (
+                  <div style={{ fontSize: 10, fontWeight: 600, color: '#f87171', background: 'rgba(248,113,113,0.12)', border: '1px solid rgba(248,113,113,0.25)', borderRadius: 5, padding: '2px 7px' }}>
+                    ⚠ {anomalyCount} anomalía{anomalyCount > 1 ? 's' : ''}
+                  </div>
+                )}
               </div>
               <div style={{ display: 'flex', gap: 3 }}>
                 {([30, 60, 90] as const).map(d => (

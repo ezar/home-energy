@@ -1,6 +1,6 @@
 import { createClient } from '@/lib/supabase/server'
 import { ConsumptionView } from './ConsumptionView'
-import { format, startOfMonth, subMonths } from 'date-fns'
+import { format, startOfMonth, subMonths, getDay } from 'date-fns'
 import type { ChartDataPoint, DailySummary, MonthlySummary, TariffPeriod } from '@/lib/types/consumption'
 import type { ConsumptionRow, PvpcPriceRow } from '@/lib/supabase/types-helper'
 import { subDays, startOfDay } from 'date-fns'
@@ -82,14 +82,36 @@ export default async function ConsumoPage() {
     dailyMap.set(dateKey, existing)
   }
 
-  const dailyData: DailySummary[] = Array.from(dailyMap.entries()).map(([date, vals]) => ({
-    date,
-    totalKwh: vals.totalKwh,
-    estimatedCostEur: vals.costEur,
-    kwhP1: vals.p1,
-    kwhP2: vals.p2,
-    kwhP3: vals.p3,
-  }))
+  const rawDailyData = Array.from(dailyMap.entries())
+    .sort(([a], [b]) => a.localeCompare(b))
+    .map(([date, vals]) => ({ date, ...vals }))
+
+  // Compute rolling avg per weekday (last 8 same-weekday occurrences, excluding the day itself)
+  const weekdayAvgs = new Map<string, number>()
+  for (const entry of rawDailyData) {
+    const dow = getDay(new Date(entry.date)) // 0=Sun...6=Sat
+    const sameWeekdayBefore = rawDailyData
+      .filter(d => d.date < entry.date && getDay(new Date(d.date)) === dow)
+      .slice(-8)
+    if (sameWeekdayBefore.length >= 3) {
+      const avg = sameWeekdayBefore.reduce((s, d) => s + d.totalKwh, 0) / sameWeekdayBefore.length
+      weekdayAvgs.set(entry.date, avg)
+    }
+  }
+
+  const dailyData: DailySummary[] = rawDailyData.map(({ date, totalKwh, costEur, p1, p2, p3 }) => {
+    const avgForWeekday = weekdayAvgs.get(date)
+    return {
+      date,
+      totalKwh,
+      estimatedCostEur: costEur,
+      kwhP1: p1,
+      kwhP2: p2,
+      kwhP3: p3,
+      avgForWeekday,
+      isAnomalous: avgForWeekday !== undefined && totalKwh > avgForWeekday * 1.75,
+    }
+  })
 
   const monthlyMap = new Map<string, number>()
   for (const r of monthlyRows) {

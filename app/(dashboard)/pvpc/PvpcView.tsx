@@ -53,7 +53,7 @@ export function PvpcView({ data, avgPricePaid, avgMarketPrice }: Props) {
       <div style={CARD}>
         <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 12 }}>
           <div style={{ fontSize: 10.5, fontWeight: 600, color: 'var(--dim)', textTransform: 'uppercase', letterSpacing: '0.1em' }}>
-            Consumo + PVPC · Últimos 7 días
+            Consumo + PVPC · Últimos 30 días
           </div>
           <div style={{ display: 'flex', gap: 10 }}>
             {[1, 2, 3].map(p => (
