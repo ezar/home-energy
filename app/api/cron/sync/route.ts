@@ -4,9 +4,10 @@
 
 import { NextRequest, NextResponse } from 'next/server'
 import { createServiceClient } from '@/lib/supabase/server'
-import { getToken, getConsumption, datadisDatetimeToDate } from '@/lib/datadis'
+import { getToken, getConsumption, getMaxPower, datadisDatetimeToDate } from '@/lib/datadis'
 import { getPvpcPrices } from '@/lib/redata'
 import { getPeriod } from '@/lib/tariff'
+import { decrypt } from '@/lib/encrypt'
 import { format, subDays, startOfDay } from 'date-fns'
 
 export const dynamic = 'force-dynamic'
@@ -14,6 +15,12 @@ export const maxDuration = 300
 
 function toDatadisMonth(date: Date): string {
   return format(date, 'yyyy/MM')
+}
+
+function maxPowerPeriod(p: string): 1 | 2 | 3 {
+  if (p === 'PUNTA') return 1
+  if (p === 'LLANO') return 2
+  return 3
 }
 
 export async function GET(request: NextRequest) {
@@ -26,7 +33,6 @@ export async function GET(request: NextRequest) {
 
   const serviceClient = await createServiceClient()
 
-  // Obtener todos los usuarios con Datadis configurado
   const { data: profiles, error } = await serviceClient
     .from('profiles')
     .select('id, datadis_username, datadis_password_encrypted, datadis_authorized_nif')
@@ -37,18 +43,16 @@ export async function GET(request: NextRequest) {
     return NextResponse.json({ error: 'Error obteniendo perfiles' }, { status: 500 })
   }
 
-  // Sincronizar últimos 3 días para cubrir retrasos de Datadis
   const now = new Date()
   const startDate = startOfDay(subDays(now, 3))
   const startDateStr = toDatadisMonth(startDate)
   const endDateStr = toDatadisMonth(now)
 
-  const results: Array<{ userId: string; cups: string; synced: number; error?: string }> = []
+  const results: Array<{ userId: string; cups: string; synced: number; maximeter: number; error?: string }> = []
 
   for (const profile of profiles) {
     if (!profile.datadis_username || !profile.datadis_password_encrypted) continue
 
-    // Get active supplies for this user
     const { data: suppliesRaw } = await serviceClient
       .from('user_supplies')
       .select('cups, distributor_code, point_type')
@@ -59,9 +63,14 @@ export async function GET(request: NextRequest) {
     if (supplies.length === 0) continue
 
     try {
-      const token = await getToken(profile.datadis_username, profile.datadis_password_encrypted)
+      const password = decrypt(profile.datadis_password_encrypted)
+      const token = await getToken(profile.datadis_username, password)
 
       for (const supply of supplies) {
+        let syncedCount = 0
+        let maximeterCount = 0
+
+        // Consumo
         const consumptionData = await getConsumption(token, {
           cups: supply.cups,
           distributorCode: supply.distributor_code,
@@ -89,8 +98,42 @@ export async function GET(request: NextRequest) {
             .from('consumption')
             .upsert(rows, { onConflict: 'user_id,cups,datetime' })
 
-          results.push({ userId: profile.id, cups: supply.cups, synced: rows.length })
+          syncedCount = rows.length
         }
+
+        // Maxímetro
+        try {
+          const maxPowerData = await getMaxPower(token, {
+            cups: supply.cups,
+            distributorCode: supply.distributor_code,
+            startDate: startDateStr,
+            endDate: endDateStr,
+            authorizedNif: profile.datadis_authorized_nif ?? undefined,
+          })
+
+          if (maxPowerData.maxPower?.length) {
+            const maxRows = maxPowerData.maxPower.map(entry => {
+              const datetime = datadisDatetimeToDate(entry.date, entry.time)
+              return {
+                user_id: profile.id,
+                cups: supply.cups,
+                datetime: datetime.toISOString(),
+                max_power_kw: entry.maxPower / 1000,
+                period: maxPowerPeriod(entry.period),
+              }
+            })
+
+            await (serviceClient as any)
+              .from('maximeter')
+              .upsert(maxRows, { onConflict: 'user_id,cups,datetime' })
+
+            maximeterCount = maxRows.length
+          }
+        } catch {
+          // Fallo de maxímetro no interrumpe el sync
+        }
+
+        results.push({ userId: profile.id, cups: supply.cups, synced: syncedCount, maximeter: maximeterCount })
       }
 
       await serviceClient
@@ -99,11 +142,11 @@ export async function GET(request: NextRequest) {
         .eq('id', profile.id)
     } catch (err) {
       const msg = err instanceof Error ? err.message : 'Error desconocido'
-      results.push({ userId: profile.id, cups: '?', synced: 0, error: msg })
+      results.push({ userId: profile.id, cups: '?', synced: 0, maximeter: 0, error: msg })
     }
   }
 
-  // Sincronizar PVPC una sola vez para todos los usuarios
+  // PVPC — una sola vez para todos los usuarios
   try {
     const pvpcPrices = await getPvpcPrices(startDate, now)
     if (pvpcPrices.length > 0) {

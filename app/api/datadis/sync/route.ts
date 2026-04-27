@@ -3,8 +3,9 @@
 // Siempre server-side — las credenciales nunca llegan al cliente.
 
 import { createClient, createServiceClient } from '@/lib/supabase/server'
-import { getToken, getConsumption, datadisDatetimeToDate } from '@/lib/datadis'
+import { getToken, getConsumption, getMaxPower, datadisDatetimeToDate } from '@/lib/datadis'
 import { getPeriod } from '@/lib/tariff'
+import { decrypt } from '@/lib/encrypt'
 import type { ProfileRow, ConsumptionInsert } from '@/lib/supabase/types-helper'
 import { format, subMonths, subDays, startOfMonth, addMonths, parseISO, isBefore } from 'date-fns'
 import { es } from 'date-fns/locale'
@@ -19,24 +20,45 @@ const SSE_HEADERS = {
   'X-Accel-Buffering': 'no',
 }
 
+const TIMEOUT_MS = 55_000
+
 type LogType = 'info' | 'ok' | 'warn' | 'error' | 'done'
 
 function toDatadisMonth(date: Date): string {
   return format(date, 'yyyy/MM')
 }
 
+function maxPowerPeriod(p: string): 1 | 2 | 3 {
+  if (p === 'PUNTA') return 1
+  if (p === 'LLANO') return 2
+  return 3
+}
+
 function makeStream(run: (send: (type: LogType, msg: string) => void) => Promise<void>): Response {
   const encoder = new TextEncoder()
   const stream = new ReadableStream({
     async start(controller) {
+      let closed = false
       const send = (type: LogType, msg: string) => {
-        controller.enqueue(encoder.encode(`data: ${JSON.stringify({ type, msg })}\n\n`))
+        if (closed) return
+        try {
+          controller.enqueue(encoder.encode(`data: ${JSON.stringify({ type, msg })}\n\n`))
+        } catch { /* stream already closed */ }
       }
+
+      const timeout = new Promise<void>((resolve) =>
+        setTimeout(() => {
+          send('error', `Timeout: la operación superó ${TIMEOUT_MS / 1000}s`)
+          resolve()
+        }, TIMEOUT_MS)
+      )
+
       try {
-        await run(send)
+        await Promise.race([run(send), timeout])
       } catch (err) {
         send('error', err instanceof Error ? err.message : 'Error desconocido')
       } finally {
+        closed = true
         controller.close()
       }
     },
@@ -45,10 +67,6 @@ function makeStream(run: (send: (type: LogType, msg: string) => void) => Promise
 }
 
 export async function POST() {
-  const encoder = new TextEncoder()
-  void encoder
-
-  // Auth y perfil deben resolverse antes de crear el stream (usan next/headers)
   const supabase = await createClient()
   const { data: { user }, error: authError } = await supabase.auth.getUser()
 
@@ -72,11 +90,9 @@ export async function POST() {
     return makeStream(async (send) => { send('error', 'Credenciales Datadis no configuradas') })
   }
 
-  // Capturar valores para usarlos en el closure
   const { datadis_username, datadis_password_encrypted, datadis_authorized_nif, last_sync_at } = profile
 
   return makeStream(async (send) => {
-    // ── Aviso rate limit ──────────────────────────────────────────────
     if (last_sync_at) {
       const hoursSince = (Date.now() - new Date(last_sync_at).getTime()) / 3_600_000
       if (hoursSince < 20) {
@@ -84,7 +100,7 @@ export async function POST() {
       }
     }
 
-    // ── Get active supplies ───────────────────────────────────────────
+    // ── Suministros activos ───────────────────────────────────────────
     const { data: suppliesRaw } = await (serviceClient as any)
       .from('user_supplies')
       .select('cups, distributor_code, point_type, display_name')
@@ -109,11 +125,11 @@ export async function POST() {
 
     // ── Token ─────────────────────────────────────────────────────────
     send('info', `Autenticando en Datadis como ${datadis_username}...`)
-    const token = await getToken(datadis_username!, datadis_password_encrypted!)
+    const password = decrypt(datadis_password_encrypted!)
+    const token = await getToken(datadis_username!, password)
     send('ok', 'Token obtenido')
 
-    // ── Chunks mensuales ─────────────────────────────────────────────
-    // Datadis da 429 si el rango es demasiado grande — máx 1 mes por petición
+    // ── Rango de fechas ───────────────────────────────────────────────
     const now = new Date()
     const startDate = last_sync_at
       ? subDays(parseISO(last_sync_at), 5)
@@ -128,21 +144,22 @@ export async function POST() {
 
     send('info', `Rango: ${format(startDate, 'dd MMM yyyy', { locale: es })} → ${format(now, 'dd MMM yyyy', { locale: es })} (${months.length} mes${months.length !== 1 ? 'es' : ''})`)
 
-    // ── Consumo por suministro y chunks ───────────────────────────────
+    // ── Por suministro ────────────────────────────────────────────────
     const allRows: ConsumptionInsert[] = []
 
     for (const supply of supplies) {
       send('info', `Suministro: ${supply.display_name ?? supply.cups}`)
 
+      // Consumo horario
       for (const monthStart of months) {
         const monthLabel = format(monthStart, 'MMM yyyy', { locale: es })
-        send('info', `Consultando ${monthLabel}...`)
+        send('info', `Consultando consumo ${monthLabel}...`)
 
         const consumptionData = await getConsumption(token, {
           cups: supply.cups,
           distributorCode: supply.distributor_code,
           startDate: toDatadisMonth(monthStart),
-          endDate: toDatadisMonth(monthStart),   // mismo mes en ambos extremos
+          endDate: toDatadisMonth(monthStart),
           measurementType: '0',
           pointType: String(supply.point_type ?? 5),
           authorizedNif: datadis_authorized_nif ?? undefined,
@@ -163,30 +180,62 @@ export async function POST() {
           })
         }
       }
+
+      // Maxímetro (potencia máxima mensual)
+      try {
+        send('info', `Consultando maxímetro para ${supply.display_name ?? supply.cups}...`)
+        const maxPowerData = await getMaxPower(token, {
+          cups: supply.cups,
+          distributorCode: supply.distributor_code,
+          startDate: toDatadisMonth(startDate),
+          endDate: toDatadisMonth(now),
+          authorizedNif: datadis_authorized_nif ?? undefined,
+        })
+
+        if (maxPowerData.maxPower?.length) {
+          const maxRows = maxPowerData.maxPower.map(entry => {
+            const datetime = datadisDatetimeToDate(entry.date, entry.time)
+            return {
+              user_id: user.id,
+              cups: supply.cups,
+              datetime: datetime.toISOString(),
+              max_power_kw: entry.maxPower / 1000,
+              period: maxPowerPeriod(entry.period),
+            }
+          })
+
+          await (serviceClient as any)
+            .from('maximeter')
+            .upsert(maxRows, { onConflict: 'user_id,cups,datetime' })
+
+          send('ok', `Maxímetro: ${maxRows.length} registros guardados`)
+        } else {
+          send('info', 'Maxímetro: sin datos en el rango')
+        }
+      } catch (err) {
+        // Fallo de maxímetro no interrumpe el sync de consumo
+        send('warn', `Maxímetro no disponible: ${err instanceof Error ? err.message : 'error'}`)
+      }
     }
 
-    const count = allRows.length
-
-    if (count === 0) {
-      send('warn', 'Sin datos en el rango consultado — puede ser retraso de Datadis (~2 días)')
+    // ── Guardar consumo ───────────────────────────────────────────────
+    if (allRows.length === 0) {
+      send('warn', 'Sin datos de consumo en el rango — puede ser retraso de Datadis (~2 días)')
       await (serviceClient as any).from('profiles').update({ last_sync_at: now.toISOString() }).eq('id', user.id)
       send('done', 'Sync completado (0 registros nuevos)')
       return
     }
 
-    // ── Guardar ───────────────────────────────────────────────────────
-    send('info', `Guardando ${count} registros en base de datos...`)
-
-    const rows = allRows
+    send('info', `Guardando ${allRows.length} registros de consumo...`)
 
     const { error: upsertError } = await (serviceClient as any)
       .from('consumption')
-      .upsert(rows, { onConflict: 'user_id,cups,datetime' })
+      .upsert(allRows, { onConflict: 'user_id,cups,datetime' })
 
     if (upsertError) throw new Error(`Error guardando: ${(upsertError as { message: string }).message}`)
 
     await (serviceClient as any).from('profiles').update({ last_sync_at: now.toISOString() }).eq('id', user.id)
 
-    send('done', `✓ Sync completado — ${count} registros guardados`)
+    send('done', `✓ Sync completado — ${allRows.length} registros guardados`)
   })
 }

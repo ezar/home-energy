@@ -104,17 +104,33 @@ export function ConfigForm({ profile, supplies: initialSupplies }: ConfigFormPro
       power_price_eur_kw_month: parseFloat(powerPriceKwMonth) || null,
       monthly_kwh_target: parseFloat(monthlyTarget) || null,
     }
-    if (datadisPassword) updates.datadis_password_encrypted = datadisPassword
 
     const { error } = await (supabase as any)
       .from('profiles').update(updates).eq('id', profile?.id ?? '')
 
     if (error) {
       setSaveMsg({ ok: false, text: (error as { message: string }).message })
-    } else {
-      setSaveMsg({ ok: true, text: 'Guardado' })
+      setSaving(false)
+      return
+    }
+
+    // Contraseña Datadis: siempre server-side para cifrado correcto
+    if (datadisPassword) {
+      const res = await fetch('/api/datadis/credentials', {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ password: datadisPassword }),
+      })
+      if (!res.ok) {
+        const d = await res.json().catch(() => ({})) as { error?: string }
+        setSaveMsg({ ok: false, text: d.error ?? 'Error guardando contraseña' })
+        setSaving(false)
+        return
+      }
       setDatadisPassword('')
     }
+
+    setSaveMsg({ ok: true, text: 'Guardado' })
     setSaving(false)
   }
 
