@@ -1,9 +1,10 @@
 import { createClient } from '@/lib/supabase/server'
+import { getTranslations, getLocale } from 'next-intl/server'
 import { CostLineChart } from '@/components/charts/CostLineChart'
 import { TariffSimulator } from './TariffSimulator'
 import { CupsSelector } from '@/components/dashboard/CupsSelector'
 import { startOfMonth, subMonths, format, getDate, getDaysInMonth } from 'date-fns'
-import { es } from 'date-fns/locale'
+import { es, enUS } from 'date-fns/locale'
 import type { ConsumptionRow, PvpcPriceRow, ProfileRow, MaximeterRow, UserSupplyRow } from '@/lib/supabase/types-helper'
 import {
   tariffConfigFromProfile, getEnergyPrice,
@@ -13,7 +14,7 @@ import {
 export const dynamic = 'force-dynamic'
 
 const PERIOD_COLORS: Record<number, string> = { 1: '#f87171', 2: '#fbbf24', 3: '#34d399' }
-const PERIOD_NAMES: Record<number, string> = { 1: 'P1 Punta', 2: 'P2 Llano', 3: 'P3 Valle' }
+const PERIOD_NAMES_STATIC: Record<number, string> = { 1: 'P1 Punta', 2: 'P2 Llano', 3: 'P3 Valle' }
 
 const CARD = {
   background: 'var(--card-grad)', border: '1px solid var(--border-c)',
@@ -24,6 +25,13 @@ export default async function CostePage({ searchParams }: { searchParams: { cups
   const supabase = await createClient()
   const { data: { user } } = await supabase.auth.getUser()
   if (!user) return null
+
+  const [locale, t, tp] = await Promise.all([
+    getLocale(),
+    getTranslations('Cost'),
+    getTranslations('Period'),
+  ])
+  const dateFnsLocale = locale === 'en' ? enUS : es
 
   const selectedCups = searchParams.cups ?? null
   const now = new Date()
@@ -56,8 +64,8 @@ export default async function CostePage({ searchParams }: { searchParams: { cups
   const months = [0, 1, 2].map(offset => {
     const d = subMonths(now, offset)
     return {
-      label: format(d, 'MMMM yyyy', { locale: es }),
-      shortLabel: format(d, 'MMM', { locale: es }),
+      label: format(d, 'MMMM yyyy', { locale: dateFnsLocale }),
+      shortLabel: format(d, 'MMM', { locale: dateFnsLocale }),
       start: startOfMonth(d).toISOString(),
       end: offset === 0 ? now.toISOString() : startOfMonth(subMonths(d, -1)).toISOString(),
       isCurrentMonth: offset === 0,
@@ -118,6 +126,8 @@ export default async function CostePage({ searchParams }: { searchParams: { cups
     })
   )
 
+  const PERIOD_NAMES: Record<number, string> = { 1: tp('1'), 2: tp('2'), 3: tp('3') }
+
   const current = monthlyStats[0]
   const avgPrice = current.totalKwh > 0 ? current.totalCost / current.totalKwh : 0
 
@@ -145,9 +155,9 @@ export default async function CostePage({ searchParams }: { searchParams: { cups
       {/* Top stats */}
       <div className="g3">
         {[
-          { label: 'Energía (sin impuestos)', val: current.totalCost.toFixed(2), unit: '€', color: 'var(--text)' },
-          { label: 'kWh consumidos', val: current.totalKwh.toFixed(1), unit: 'kWh', color: '#38bdf8' },
-          { label: 'Precio medio energía', val: avgPrice > 0 ? avgPrice.toFixed(5) : '—', unit: '€/kWh', color: '#a78bfa' },
+          { label: t('energyNoTax'), val: current.totalCost.toFixed(2), unit: '€', color: 'var(--text)' },
+          { label: t('kwhConsumed'), val: current.totalKwh.toFixed(1), unit: 'kWh', color: '#38bdf8' },
+          { label: t('avgEnergyPrice'), val: avgPrice > 0 ? avgPrice.toFixed(5) : '—', unit: '€/kWh', color: '#a78bfa' },
         ].map(item => (
           <div key={item.label} style={CARD}>
             <div style={{ fontSize: 10.5, fontWeight: 500, color: 'var(--dim)', textTransform: 'uppercase', letterSpacing: '0.06em', marginBottom: 8 }}>{item.label}</div>
@@ -161,7 +171,7 @@ export default async function CostePage({ searchParams }: { searchParams: { cups
       {/* Period breakdown */}
       <div style={CARD}>
         <div style={{ fontSize: 10.5, fontWeight: 600, color: 'var(--dim)', textTransform: 'uppercase', letterSpacing: '0.1em', marginBottom: 12 }}>
-          Desglose por período
+          {t('periodBreakdown')}
         </div>
         <div className="g3" style={{ gap: 10 }}>
           {byPeriod.map(({ period, kwh, cost }) => {
@@ -184,8 +194,8 @@ export default async function CostePage({ searchParams }: { searchParams: { cups
                 <div style={{ fontSize: 14, color: '#34d399', marginTop: 3, fontFamily: 'var(--font-mono)' }}>{cost.toFixed(2)} €</div>
                 <div style={{ fontSize: 10, color: 'var(--dim)', marginTop: 6 }}>
                   {fixedPrice != null
-                    ? <span>Precio fijo: <span style={{ color: 'var(--muted-c)', fontFamily: 'var(--font-mono)' }}>{fixedPrice.toFixed(5)} €/kWh</span></span>
-                    : <span>Precio medio: <span style={{ color: 'var(--muted-c)', fontFamily: 'var(--font-mono)' }}>{avgP > 0 ? avgP.toFixed(5) : '—'} €/kWh</span></span>
+                    ? <span>{t('fixedPrice')} <span style={{ color: 'var(--muted-c)', fontFamily: 'var(--font-mono)' }}>{fixedPrice.toFixed(5)} €/kWh</span></span>
+                    : <span>{t('avgPrice')} <span style={{ color: 'var(--muted-c)', fontFamily: 'var(--font-mono)' }}>{avgP > 0 ? avgP.toFixed(5) : '—'} €/kWh</span></span>
                   }
                 </div>
                 <div style={{ marginTop: 8, background: 'var(--bg-inset)', borderRadius: 3, height: 3 }}>
@@ -202,13 +212,13 @@ export default async function CostePage({ searchParams }: { searchParams: { cups
         {/* Breakdown */}
         <div style={CARD}>
           <div style={{ fontSize: 10.5, fontWeight: 600, color: 'var(--dim)', textTransform: 'uppercase', letterSpacing: '0.1em', marginBottom: 14 }}>
-            Factura estimada · {current.label}
+            {t('estimatedBill', { month: current.label })}
           </div>
           {[
-            { label: 'Término de energía', val: current.totalCost, color: '#60a5fa' },
-            ...(hasPower ? [{ label: `Término de potencia (${tariffConfig.powerKw} kW)`, val: powerTerm, color: '#a78bfa' }] : []),
-            { label: `Impuesto eléctrico (${(ELECTRICITY_TAX_RATE * 100).toFixed(2)}%)`, val: bill.electricityTax, color: 'var(--muted-c)' },
-            { label: `IVA (${(VAT_RATE * 100).toFixed(0)}%)`, val: bill.vat, color: 'var(--muted-c)' },
+            { label: t('energyTerm'), val: current.totalCost, color: '#60a5fa' },
+            ...(hasPower ? [{ label: t('powerTerm', { kw: tariffConfig.powerKw }), val: powerTerm, color: '#a78bfa' }] : []),
+            { label: t('electricityTax', { pct: (ELECTRICITY_TAX_RATE * 100).toFixed(2) }), val: bill.electricityTax, color: 'var(--muted-c)' },
+            { label: t('vat', { pct: (VAT_RATE * 100).toFixed(0) }), val: bill.vat, color: 'var(--muted-c)' },
           ].map(({ label, val, color }) => (
             <div key={label} style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: '7px 0', borderBottom: '1px solid var(--border-subtle)' }}>
               <span style={{ fontSize: 12, color: 'var(--dim)' }}>{label}</span>
@@ -216,12 +226,12 @@ export default async function CostePage({ searchParams }: { searchParams: { cups
             </div>
           ))}
           <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', paddingTop: 10, marginTop: 4 }}>
-            <span style={{ fontSize: 13, fontWeight: 600, color: 'var(--text)' }}>Total con IVA</span>
+            <span style={{ fontSize: 13, fontWeight: 600, color: 'var(--text)' }}>{t('totalWithVat')}</span>
             <span style={{ fontSize: 20, fontWeight: 700, color: '#34d399', fontFamily: 'var(--font-mono)' }}>{bill.total.toFixed(2)} €</span>
           </div>
           {!hasPower && (
             <p style={{ fontSize: 10.5, color: 'var(--dim2)', marginTop: 10 }}>
-              Configura la potencia contratada en Configuración para incluir el término de potencia.
+              {t('noPowerNote')}
             </p>
           )}
         </div>
@@ -229,15 +239,15 @@ export default async function CostePage({ searchParams }: { searchParams: { cups
         {/* Proyección */}
         <div style={CARD}>
           <div style={{ fontSize: 10.5, fontWeight: 600, color: 'var(--dim)', textTransform: 'uppercase', letterSpacing: '0.1em', marginBottom: 4 }}>
-            Proyección fin de mes
+            {t('projection')}
           </div>
           <div style={{ fontSize: 11, color: 'var(--dim2)', marginBottom: 14 }}>
-            Basada en la media de los {daysElapsed} días transcurridos
+            {t('projectionNote', { days: daysElapsed })}
           </div>
           {[
-            { label: 'Energía proyectada', val: projectedEnergy.toFixed(2), unit: '€', color: '#60a5fa' },
-            ...(hasPower ? [{ label: 'Potencia (fija)', val: powerTerm.toFixed(2), unit: '€', color: '#a78bfa' }] : []),
-            { label: 'Con impuestos', val: projectedBill.total.toFixed(2), unit: '€', color: '#34d399' },
+            { label: t('projectedEnergy'), val: projectedEnergy.toFixed(2), unit: '€', color: '#60a5fa' },
+            ...(hasPower ? [{ label: t('projectedPower'), val: powerTerm.toFixed(2), unit: '€', color: '#a78bfa' }] : []),
+            { label: t('projectedWithTax'), val: projectedBill.total.toFixed(2), unit: '€', color: '#34d399' },
           ].map(({ label, val, unit, color }) => (
             <div key={label} style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: '8px 0', borderBottom: '1px solid var(--border-subtle)' }}>
               <span style={{ fontSize: 12, color: 'var(--dim)' }}>{label}</span>
@@ -246,7 +256,7 @@ export default async function CostePage({ searchParams }: { searchParams: { cups
           ))}
           <div style={{ marginTop: 14 }}>
             <div style={{ fontSize: 10, color: 'var(--dim)', marginBottom: 6 }}>
-              Progreso del mes ({daysElapsed}/{daysInMonth} días)
+              {t('monthProgress', { elapsed: daysElapsed, total: daysInMonth })}
             </div>
             <div style={{ height: 6, background: 'var(--bg-inset)', borderRadius: 3, overflow: 'hidden' }}>
               <div style={{
@@ -270,12 +280,12 @@ export default async function CostePage({ searchParams }: { searchParams: { cups
         return (
           <div style={CARD}>
             <div style={{ fontSize: 10.5, fontWeight: 600, color: 'var(--dim)', textTransform: 'uppercase', letterSpacing: '0.1em', marginBottom: 14 }}>
-              Eficiencia vs mercado PVPC · {current.label}
+              {t('vsMarket', { month: current.label })}
             </div>
             <div style={{ display: 'flex', gap: 12, flexWrap: 'wrap', marginBottom: 14 }}>
               {[
-                { label: 'Tu coste (tarifa fija)', val: current.totalCost.toFixed(2), unit: '€', color: '#60a5fa', note: `${avgFixed.toFixed(5)} €/kWh` },
-                { label: 'Coste a precio PVPC', val: current.marketCost.toFixed(2), unit: '€', color: '#a78bfa', note: `${avgMarket.toFixed(5)} €/kWh` },
+                { label: t('yourCost'), val: current.totalCost.toFixed(2), unit: '€', color: '#60a5fa', note: `${avgFixed.toFixed(5)} €/kWh` },
+                { label: t('marketCost'), val: current.marketCost.toFixed(2), unit: '€', color: '#a78bfa', note: `${avgMarket.toFixed(5)} €/kWh` },
               ].map(({ label, val, unit, color, note }) => (
                 <div key={label} style={{ flex: '1 1 140px', padding: '12px 14px', borderRadius: 10, background: 'var(--bg-inset)', border: '1px solid var(--border-c)' }}>
                   <div style={{ fontSize: 10.5, color: 'var(--dim)', marginBottom: 6 }}>{label}</div>
@@ -284,18 +294,18 @@ export default async function CostePage({ searchParams }: { searchParams: { cups
                 </div>
               ))}
               <div style={{ flex: '1 1 140px', padding: '12px 14px', borderRadius: 10, background: savedSign ? 'rgba(52,211,153,0.08)' : 'rgba(248,113,113,0.08)', border: `1px solid ${savedColor}30` }}>
-                <div style={{ fontSize: 10.5, color: 'var(--dim)', marginBottom: 6 }}>{savedSign ? 'Ahorraste vs mercado' : 'Pagaste de más vs mercado'}</div>
+                <div style={{ fontSize: 10.5, color: 'var(--dim)', marginBottom: 6 }}>{savedSign ? t('savedVsMarket') : t('paidMoreVsMarket')}</div>
                 <div style={{ fontSize: 22, fontWeight: 700, color: savedColor, fontFamily: 'var(--font-mono)' }}>
                   {savedSign ? '+' : ''}{savedVsMarket.toFixed(2)} <span style={{ fontSize: 12, color: 'var(--muted-c)', fontFamily: 'var(--font-sans)' }}>€</span>
                 </div>
                 <div style={{ fontSize: 10, color: 'var(--dim)', marginTop: 3 }}>
-                  Cobertura PVPC: {coveragePct}%
+                  {t('pvpcCoverage', { pct: coveragePct })}
                 </div>
               </div>
             </div>
             {coveragePct < 90 && (
               <p style={{ fontSize: 10.5, color: 'var(--dim2)', margin: 0 }}>
-                Cobertura de precios PVPC del {coveragePct}%. Los kWh sin precio PVPC no se incluyen en el cálculo de mercado.
+                {t('pvpcCoverageNote', { pct: coveragePct })}
               </p>
             )}
           </div>
@@ -308,50 +318,49 @@ export default async function CostePage({ searchParams }: { searchParams: { cups
         const peakKw = peak.max_power_kw
         const contracted = tariffConfig.powerKw ?? 0
         const exceeded = contracted > 0 && peakKw > contracted
-        const PERIOD_NAMES_MAX: Record<number, string> = { 1: 'P1 Punta', 2: 'P2 Llano', 3: 'P3 Valle' }
         const peakColor = exceeded ? '#f87171' : '#34d399'
         return (
           <div style={{ ...CARD, borderColor: exceeded ? 'rgba(248,113,113,0.3)' : 'var(--border-c)' }}>
             <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: 14 }}>
               <div style={{ fontSize: 10.5, fontWeight: 600, color: 'var(--dim)', textTransform: 'uppercase', letterSpacing: '0.1em' }}>
-                Maxímetro · {format(now, 'MMMM yyyy', { locale: es })}
+                {t('maximeter', { month: format(now, 'MMMM yyyy', { locale: dateFnsLocale }) })}
               </div>
               {exceeded && (
                 <div style={{ fontSize: 10.5, fontWeight: 600, color: '#f87171', background: 'rgba(248,113,113,0.1)', border: '1px solid rgba(248,113,113,0.25)', borderRadius: 6, padding: '3px 9px' }}>
-                  ⚠ Potencia excedida
+                  {t('powerExceeded')}
                 </div>
               )}
             </div>
             <div style={{ display: 'flex', gap: 12, flexWrap: 'wrap' }}>
               <div style={{ flex: '1 1 130px', padding: '12px 14px', borderRadius: 10, background: 'var(--bg-inset)', border: `1px solid ${peakColor}30` }}>
-                <div style={{ fontSize: 10.5, color: 'var(--dim)', marginBottom: 6 }}>Pico máximo registrado</div>
+                <div style={{ fontSize: 10.5, color: 'var(--dim)', marginBottom: 6 }}>{t('peakPower')}</div>
                 <div style={{ fontSize: 26, fontWeight: 700, color: peakColor, fontFamily: 'var(--font-mono)', letterSpacing: '-0.02em' }}>
                   {peakKw.toFixed(3)} <span style={{ fontSize: 13, fontWeight: 400, color: 'var(--muted-c)', fontFamily: 'var(--font-sans)' }}>kW</span>
                 </div>
                 <div style={{ fontSize: 10.5, color: 'var(--dim)', marginTop: 4 }}>
-                  {format(new Date(peak.datetime), "d MMM · HH:mm", { locale: es })}
-                  {peak.period && <span style={{ marginLeft: 6 }}>· {PERIOD_NAMES_MAX[peak.period] ?? ''}</span>}
+                  {format(new Date(peak.datetime), "d MMM · HH:mm", { locale: dateFnsLocale })}
+                  {peak.period && <span style={{ marginLeft: 6 }}>· {PERIOD_NAMES[peak.period] ?? ''}</span>}
                 </div>
               </div>
               {contracted > 0 && (
                 <div style={{ flex: '1 1 130px', padding: '12px 14px', borderRadius: 10, background: 'var(--bg-inset)', border: '1px solid var(--border-c)' }}>
-                  <div style={{ fontSize: 10.5, color: 'var(--dim)', marginBottom: 6 }}>Potencia contratada</div>
+                  <div style={{ fontSize: 10.5, color: 'var(--dim)', marginBottom: 6 }}>{t('contractedPower')}</div>
                   <div style={{ fontSize: 26, fontWeight: 700, color: 'var(--text)', fontFamily: 'var(--font-mono)', letterSpacing: '-0.02em' }}>
                     {contracted.toFixed(3)} <span style={{ fontSize: 13, fontWeight: 400, color: 'var(--muted-c)', fontFamily: 'var(--font-sans)' }}>kW</span>
                   </div>
                   <div style={{ fontSize: 10.5, color: exceeded ? '#f87171' : '#34d399', marginTop: 4, fontWeight: 500 }}>
                     {exceeded
-                      ? `Exceso: +${(peakKw - contracted).toFixed(3)} kW`
-                      : `Margen: ${(contracted - peakKw).toFixed(3)} kW libre`}
+                      ? t('excess', { kw: (peakKw - contracted).toFixed(3) })
+                      : t('margin', { kw: (contracted - peakKw).toFixed(3) })}
                   </div>
                 </div>
               )}
               <div style={{ flex: '2 1 200px', padding: '12px 14px', borderRadius: 10, background: 'var(--bg-inset)', border: '1px solid var(--border-c)', display: 'flex', flexDirection: 'column', gap: 4 }}>
-                <div style={{ fontSize: 10.5, color: 'var(--dim)', marginBottom: 2 }}>Top picos este mes</div>
+                <div style={{ fontSize: 10.5, color: 'var(--dim)', marginBottom: 2 }}>{t('topPeaks')}</div>
                 {maximeterRows.slice(0, 5).map((r, i) => (
                   <div key={i} style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', fontSize: 11 }}>
                     <span style={{ color: 'var(--dim)', fontFamily: 'var(--font-mono)' }}>
-                      {format(new Date(r.datetime), 'd MMM HH:mm', { locale: es })}
+                      {format(new Date(r.datetime), 'd MMM HH:mm', { locale: dateFnsLocale })}
                     </span>
                     <span style={{ color: contracted > 0 && r.max_power_kw > contracted ? '#f87171' : 'var(--text-2)', fontFamily: 'var(--font-mono)', fontWeight: 600 }}>
                       {r.max_power_kw.toFixed(3)} kW
@@ -362,7 +371,7 @@ export default async function CostePage({ searchParams }: { searchParams: { cups
             </div>
             {exceeded && (
               <p style={{ fontSize: 10.5, color: 'var(--dim2)', margin: '10px 0 0', lineHeight: 1.6 }}>
-                La potencia máxima registrada supera la contratada. Dependiendo de tu comercializadora, esto puede generar penalizaciones. Considera aumentar la potencia contratada o reducir el uso simultáneo de electrodomésticos.
+                {t('exceededWarning')}
               </p>
             )}
           </div>
@@ -387,23 +396,23 @@ export default async function CostePage({ searchParams }: { searchParams: { cups
       <div className="g2">
         <div style={CARD}>
           <div style={{ fontSize: 10.5, fontWeight: 600, color: 'var(--dim)', textTransform: 'uppercase', letterSpacing: '0.1em', marginBottom: 12 }}>
-            Coste acumulado · {current.label}
+            {t('cumulativeCost', { month: current.label })}
           </div>
           <CostLineChart data={current.dailyCumul} />
           {current.dailyCumul.length > 0 && (
             <div style={{ marginTop: 8, fontSize: 11.5, color: 'var(--dim)' }}>
-              Energía: <span style={{ color: '#34d399', fontWeight: 600, fontFamily: 'var(--font-mono)' }}>{current.totalCost.toFixed(2)} €</span>
-              {hasPower && <span style={{ marginLeft: 8 }}>· Potencia: <span style={{ color: '#a78bfa', fontWeight: 600, fontFamily: 'var(--font-mono)' }}>{powerTerm.toFixed(2)} €</span></span>}
+              {t('energyLabel')} <span style={{ color: '#34d399', fontWeight: 600, fontFamily: 'var(--font-mono)' }}>{current.totalCost.toFixed(2)} €</span>
+              {hasPower && <span style={{ marginLeft: 8 }}>· {t('powerLabel')} <span style={{ color: '#a78bfa', fontWeight: 600, fontFamily: 'var(--font-mono)' }}>{powerTerm.toFixed(2)} €</span></span>}
             </div>
           )}
         </div>
 
         <div style={{ ...CARD, overflow: 'auto', maxHeight: 280 }}>
           <div style={{ fontSize: 10.5, fontWeight: 600, color: 'var(--dim)', textTransform: 'uppercase', letterSpacing: '0.1em', marginBottom: 12 }}>
-            Histórico mensual
+            {t('monthlyHistory')}
           </div>
           <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr 1fr' }}>
-            {['Mes', 'kWh', '€ medio', 'Energía'].map(h => (
+            {[t('colMonth'), t('colKwh'), t('colAvgPrice'), t('colEnergy')].map(h => (
               <div key={h} style={{ fontSize: 9.5, fontWeight: 600, color: 'var(--dim)', textTransform: 'uppercase', letterSpacing: '0.06em', padding: '4px 8px', borderBottom: '1px solid var(--border-c)' }}>{h}</div>
             ))}
             {monthlyStats.map((m, i) => (

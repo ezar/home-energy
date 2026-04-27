@@ -1,6 +1,7 @@
 'use client'
 
 import { useRouter, usePathname, useSearchParams } from 'next/navigation'
+import { useTranslations } from 'next-intl'
 import type { UserSupplyRow } from '@/lib/supabase/types-helper'
 
 interface Props {
@@ -25,6 +26,7 @@ export function CupsSelector({ supplies, selected }: Props) {
   const router = useRouter()
   const pathname = usePathname()
   const searchParams = useSearchParams()
+  const t = useTranslations('CupsSelector')
 
   function select(cups: string | null) {
     const params = new URLSearchParams(searchParams.toString())
@@ -36,8 +38,8 @@ export function CupsSelector({ supplies, selected }: Props) {
 
   return (
     <div style={{ display: 'flex', alignItems: 'center', gap: 6, flexWrap: 'wrap' }}>
-      <span style={{ fontSize: 10.5, color: 'var(--dim)', fontWeight: 500, marginRight: 2 }}>Suministro</span>
-      <button style={PILL(!selected)} onClick={() => select(null)}>Todos</button>
+      <span style={{ fontSize: 10.5, color: 'var(--dim)', fontWeight: 500, marginRight: 2 }}>{t('label')}</span>
+      <button style={PILL(!selected)} onClick={() => select(null)}>{t('all')}</button>
       {supplies.map(s => (
         <button key={s.cups} style={PILL(selected === s.cups)} onClick={() => select(s.cups)}>
           {label(s)}

@@ -13,33 +13,44 @@ import { Label } from '@/components/ui/label'
 import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from '@/components/ui/card'
 import { Zap } from 'lucide-react'
 
-export default function LoginPage() {
+export default function RegisterPage() {
   const router = useRouter()
-  const t = useTranslations('Login')
+  const t = useTranslations('Register')
 
   const [email, setEmail] = useState('')
   const [password, setPassword] = useState('')
+  const [confirm, setConfirm] = useState('')
   const [error, setError] = useState<string | null>(null)
   const [loading, setLoading] = useState(false)
 
-  async function handleLogin(e: React.FormEvent) {
+  async function handleRegister(e: React.FormEvent) {
     e.preventDefault()
-    setLoading(true)
     setError(null)
 
+    if (password !== confirm) {
+      setError(t('errorMismatch'))
+      return
+    }
+    if (password.length < 8) {
+      setError(t('errorTooShort'))
+      return
+    }
+
+    setLoading(true)
     const supabase = createClient()
-    const { error } = await supabase.auth.signInWithPassword({ email, password })
+    const { error } = await supabase.auth.signUp({ email, password })
 
     if (error) {
-      setError(error.message === 'Invalid login credentials'
-        ? t('errorCredentials')
-        : error.message
+      setError(
+        error.message === 'User already registered'
+          ? t('errorAlreadyRegistered')
+          : error.message
       )
       setLoading(false)
       return
     }
 
-    router.push('/')
+    router.push('/welcome')
     router.refresh()
   }
 
@@ -49,11 +60,11 @@ export default function LoginPage() {
         <div className="flex justify-center mb-2">
           <Zap className="h-8 w-8 text-yellow-400" />
         </div>
-        <CardTitle>{t('appTitle')}</CardTitle>
+        <CardTitle>{t('title')}</CardTitle>
         <CardDescription>{t('tagline')}</CardDescription>
       </CardHeader>
       <CardContent>
-        <form onSubmit={handleLogin} className="space-y-4">
+        <form onSubmit={handleRegister} className="space-y-4">
           <div className="space-y-2">
             <Label htmlFor="email">{t('email')}</Label>
             <Input
@@ -71,10 +82,23 @@ export default function LoginPage() {
             <Input
               id="password"
               type="password"
+              placeholder={t('passwordPlaceholder')}
               value={password}
               onChange={(e) => setPassword(e.target.value)}
               required
-              autoComplete="current-password"
+              autoComplete="new-password"
+            />
+          </div>
+          <div className="space-y-2">
+            <Label htmlFor="confirm">{t('confirmPassword')}</Label>
+            <Input
+              id="confirm"
+              type="password"
+              placeholder={t('confirmPlaceholder')}
+              value={confirm}
+              onChange={(e) => setConfirm(e.target.value)}
+              required
+              autoComplete="new-password"
             />
           </div>
           {error && (
@@ -87,9 +111,9 @@ export default function LoginPage() {
       </CardContent>
       <CardFooter className="justify-center">
         <p className="text-sm text-muted-foreground">
-          {t('noAccount')}{' '}
-          <Link href="/register" className="text-primary underline-offset-4 hover:underline">
-            {t('registerLink')}
+          {t('hasAccount')}{' '}
+          <Link href="/login" className="text-primary underline-offset-4 hover:underline">
+            {t('loginLink')}
           </Link>
         </p>
       </CardFooter>

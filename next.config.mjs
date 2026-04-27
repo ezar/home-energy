@@ -1,4 +1,6 @@
-/** @type {import('next').NextConfig} */
+import createNextIntlPlugin from 'next-intl/plugin'
+
+const withNextIntl = createNextIntlPlugin('./i18n/request.ts')
 
 function buildVersion() {
   const now = new Date()
@@ -10,10 +12,11 @@ function buildVersion() {
   return `${yy}.${mm}.${dd}.${hh}${min}`
 }
 
+/** @type {import('next').NextConfig} */
 const nextConfig = {
   env: {
     NEXT_PUBLIC_BUILD_VERSION: buildVersion(),
   },
 }
 
-export default nextConfig
+export default withNextIntl(nextConfig)

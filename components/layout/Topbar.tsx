@@ -1,25 +1,29 @@
 'use client'
 
 import { useState } from 'react'
+import { usePathname } from 'next/navigation'
+import { useTranslations } from 'next-intl'
 import { RefreshCw } from 'lucide-react'
 import { ThemeToggle } from '@/components/dashboard/ThemeToggle'
 import { SignOutButton } from '@/components/dashboard/SignOutButton'
+import { LanguageToggle } from '@/components/dashboard/LanguageToggle'
 
-const pageTitles: Record<string, { title: string; sub: string }> = {
-  '/':              { title: 'Resumen',          sub: 'Vista general del mes' },
-  '/consumo':       { title: 'Consumo',           sub: 'Análisis horario, diario y mensual' },
-  '/coste':         { title: 'Coste estimado',    sub: 'Tarifa 2.0TD PVPC' },
-  '/pvpc':          { title: 'Comparativa PVPC',  sub: 'Consumo real vs mercado' },
-  '/configuracion': { title: 'Configuración',     sub: 'Credenciales y sincronización' },
-}
-
-interface TopbarProps {
-  pathname: string
-}
-
-export function Topbar({ pathname }: TopbarProps) {
+export function Topbar() {
   const [syncing, setSyncing] = useState(false)
-  const meta = pageTitles[pathname] ?? { title: 'Energy', sub: '' }
+  const pathname = usePathname()
+  const t = useTranslations('Topbar')
+
+  const pageTitles: Record<string, { title: string; sub: string }> = {
+    '/':             { title: t('summaryTitle'),     sub: t('summarySub') },
+    '/consumption':  { title: t('consumptionTitle'), sub: t('consumptionSub') },
+    '/cost':         { title: t('costTitle'),        sub: t('costSub') },
+    '/pvpc':         { title: t('pvpcTitle'),        sub: t('pvpcSub') },
+    '/settings':     { title: t('settingsTitle'),    sub: t('settingsSub') },
+    '/welcome':      { title: t('welcomeTitle'),     sub: t('welcomeSub') },
+    '/help':         { title: t('helpTitle'),        sub: t('helpSub') },
+  }
+
+  const meta = pageTitles[pathname] ?? { title: t('defaultTitle'), sub: '' }
 
   async function handleSync() {
     setSyncing(true)
@@ -63,8 +67,9 @@ export function Topbar({ pathname }: TopbarProps) {
           }}
         >
           <RefreshCw size={11} className={syncing ? 'spin' : ''} />
-          <span className="topbar-date">{syncing ? 'Sincronizando...' : 'Sincronizar'}</span>
+          <span className="topbar-date">{syncing ? t('syncing') : t('sync')}</span>
         </button>
+        <LanguageToggle />
         <ThemeToggle />
         <SignOutButton />
       </div>

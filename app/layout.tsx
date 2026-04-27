@@ -1,6 +1,8 @@
 import type { Metadata, Viewport } from 'next'
 import { Space_Grotesk, JetBrains_Mono } from 'next/font/google'
 import { Analytics } from '@vercel/analytics/next'
+import { NextIntlClientProvider } from 'next-intl'
+import { getLocale, getMessages } from 'next-intl/server'
 import { ThemeProvider } from '@/components/providers/ThemeProvider'
 import { SwRegister } from '@/components/providers/SwRegister'
 import './globals.css'
@@ -36,13 +38,18 @@ export const viewport: Viewport = {
   themeColor: '#111114',
 }
 
-export default function RootLayout({ children }: { children: React.ReactNode }) {
+export default async function RootLayout({ children }: { children: React.ReactNode }) {
+  const locale = await getLocale()
+  const messages = await getMessages()
+
   return (
-    <html lang="es" suppressHydrationWarning>
+    <html lang={locale} suppressHydrationWarning>
       <body className={`${spaceGrotesk.variable} ${jetbrainsMono.variable}`}>
-        <ThemeProvider>
-          {children}
-        </ThemeProvider>
+        <NextIntlClientProvider messages={messages}>
+          <ThemeProvider>
+            {children}
+          </ThemeProvider>
+        </NextIntlClientProvider>
         <SwRegister />
         <Analytics />
       </body>
