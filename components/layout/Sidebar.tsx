@@ -5,12 +5,12 @@ import { usePathname } from 'next/navigation'
 import { Zap, BarChart3, DollarSign, TrendingUp, Settings, HelpCircle } from 'lucide-react'
 
 const navItems = [
-  { href: '/',              label: 'Resumen',       icon: Zap },
-  { href: '/consumo',       label: 'Consumo',       icon: BarChart3 },
-  { href: '/coste',         label: 'Coste',         icon: DollarSign },
-  { href: '/pvpc',          label: 'PVPC',          icon: TrendingUp },
-  { href: '/configuracion', label: 'Configuración', icon: Settings },
-  { href: '/ayuda',         label: 'Ayuda',         icon: HelpCircle },
+  { href: '/',             label: 'Resumen',       icon: Zap },
+  { href: '/consumption',  label: 'Consumo',       icon: BarChart3 },
+  { href: '/cost',         label: 'Coste',         icon: DollarSign },
+  { href: '/pvpc',         label: 'PVPC',          icon: TrendingUp },
+  { href: '/settings',     label: 'Configuración', icon: Settings },
+  { href: '/help',         label: 'Ayuda',         icon: HelpCircle },
 ]
 
 interface SidebarProps {

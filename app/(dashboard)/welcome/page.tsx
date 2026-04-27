@@ -19,7 +19,7 @@ export default function BienvenidaPage() {
         .update({ onboarding_completed: true })
         .eq('id', user.id)
     }
-    router.push('/configuracion')
+    router.push('/settings')
   }
 
   return (
@@ -121,7 +121,7 @@ export default function BienvenidaPage() {
           Ir a Configuración
         </Button>
         <Button variant="outline" className="flex-1" asChild>
-          <Link href="/ayuda">
+          <Link href="/help">
             <HelpCircle size={15} className="mr-2" />
             Ver guía completa
           </Link>

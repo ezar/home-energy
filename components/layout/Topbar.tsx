@@ -6,11 +6,11 @@ import { ThemeToggle } from '@/components/dashboard/ThemeToggle'
 import { SignOutButton } from '@/components/dashboard/SignOutButton'
 
 const pageTitles: Record<string, { title: string; sub: string }> = {
-  '/':              { title: 'Resumen',          sub: 'Vista general del mes' },
-  '/consumo':       { title: 'Consumo',           sub: 'Análisis horario, diario y mensual' },
-  '/coste':         { title: 'Coste estimado',    sub: 'Tarifa 2.0TD PVPC' },
-  '/pvpc':          { title: 'Comparativa PVPC',  sub: 'Consumo real vs mercado' },
-  '/configuracion': { title: 'Configuración',     sub: 'Credenciales y sincronización' },
+  '/':             { title: 'Resumen',          sub: 'Vista general del mes' },
+  '/consumption':  { title: 'Consumo',           sub: 'Análisis horario, diario y mensual' },
+  '/cost':         { title: 'Coste estimado',    sub: 'Tarifa 2.0TD PVPC' },
+  '/pvpc':         { title: 'Comparativa PVPC',  sub: 'Consumo real vs mercado' },
+  '/settings':     { title: 'Configuración',     sub: 'Credenciales y sincronización' },
 }
 
 interface TopbarProps {

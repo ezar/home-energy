@@ -25,7 +25,7 @@ export default async function HomePage({ searchParams }: { searchParams: { cups?
     .single()
 
   if (onboardingCheck && !(onboardingCheck as { onboarding_completed: boolean }).onboarding_completed) {
-    redirect('/bienvenida')
+    redirect('/welcome')
   }
 
   const selectedCups = searchParams.cups ?? null

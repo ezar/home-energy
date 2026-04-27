@@ -48,7 +48,7 @@ export default function RegisterPage() {
       return
     }
 
-    router.push('/bienvenida')
+    router.push('/welcome')
     router.refresh()
   }
 
