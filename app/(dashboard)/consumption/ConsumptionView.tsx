@@ -1,6 +1,7 @@
 'use client'
 
 import { useState, useMemo, useCallback } from 'react'
+import { useTranslations } from 'next-intl'
 import {
   BarChart, Bar, XAxis, YAxis, CartesianGrid,
   Tooltip, ResponsiveContainer, Cell,
@@ -12,7 +13,6 @@ import { PeriodBadge } from '@/components/dashboard/PeriodBadge'
 import type { ChartDataPoint, DailySummary, MonthlySummary, TariffPeriod } from '@/lib/types/consumption'
 
 const PERIOD_COLORS: Record<number, string> = { 1: '#f87171', 2: '#fbbf24', 3: '#34d399' }
-const PERIOD_NAMES: Record<number, string> = { 1: 'P1 Punta', 2: 'P2 Llano', 3: 'P3 Valle' }
 
 const CARD: React.CSSProperties = {
   background: 'var(--card-grad)', border: '1px solid var(--border-c)',
@@ -35,6 +35,8 @@ const CHIP_STYLE = (active: boolean): React.CSSProperties => ({
   transition: 'all 0.15s', fontFamily: 'var(--font-sans)',
 })
 
+type ViewMode = 'hourly' | 'daily' | 'monthly' | 'pattern' | 'heatmap'
+
 interface Props {
   hourlyData: ChartDataPoint[]
   dailyData: DailySummary[]
@@ -42,7 +44,10 @@ interface Props {
 }
 
 export function ConsumptionView({ hourlyData, dailyData, monthlyData }: Props) {
-  const [view, setView] = useState<'horaria' | 'diaria' | 'mensual' | 'patron' | 'heatmap'>('horaria')
+  const t = useTranslations('Consumption')
+  const tc = useTranslations('Common')
+
+  const [view, setView] = useState<ViewMode>('hourly')
   const [showPvpc, setShowPvpc] = useState(false)
   const [hourlyDays, setHourlyDays] = useState<7 | 14 | 30>(7)
   const [dailyDays, setDailyDays] = useState<30 | 60 | 90>(90)
@@ -94,22 +99,22 @@ export function ConsumptionView({ hourlyData, dailyData, monthlyData }: Props) {
     let csv = ''
     let filename = ''
 
-    if (view === 'horaria') {
+    if (view === 'hourly') {
       csv = 'datetime,consumption_kwh,price_eur_kwh,cost_eur,period\n'
       csv += filteredHourly.map(d =>
         `${d.datetime},${d.consumptionKwh.toFixed(4)},${d.priceEurKwh?.toFixed(6) ?? ''},${d.estimatedCostEur?.toFixed(6) ?? ''},${d.period ?? ''}`
       ).join('\n')
-      filename = `consumo-horario-${hourlyDays}d.csv`
-    } else if (view === 'diaria') {
-      csv = 'fecha,total_kwh,coste_eur,kwh_p1,kwh_p2,kwh_p3,anomalia\n'
+      filename = `consumption-hourly-${hourlyDays}d.csv`
+    } else if (view === 'daily') {
+      csv = 'date,total_kwh,cost_eur,kwh_p1,kwh_p2,kwh_p3,anomaly\n'
       csv += filteredDaily.map(d =>
-        `${d.date},${d.totalKwh.toFixed(4)},${d.estimatedCostEur.toFixed(4)},${d.kwhP1.toFixed(4)},${d.kwhP2.toFixed(4)},${d.kwhP3.toFixed(4)},${d.isAnomalous ? 'si' : 'no'}`
+        `${d.date},${d.totalKwh.toFixed(4)},${d.estimatedCostEur.toFixed(4)},${d.kwhP1.toFixed(4)},${d.kwhP2.toFixed(4)},${d.kwhP3.toFixed(4)},${d.isAnomalous ? 'yes' : 'no'}`
       ).join('\n')
-      filename = `consumo-diario-${dailyDays}d.csv`
-    } else if (view === 'mensual') {
-      csv = 'mes,total_kwh\n'
+      filename = `consumption-daily-${dailyDays}d.csv`
+    } else if (view === 'monthly') {
+      csv = 'month,total_kwh\n'
       csv += recent12.map(d => `${d.month},${d.totalKwh.toFixed(4)}`).join('\n')
-      filename = 'consumo-mensual.csv'
+      filename = 'consumption-monthly.csv'
     } else {
       return
     }
@@ -143,7 +148,7 @@ export function ConsumptionView({ hourlyData, dailyData, monthlyData }: Props) {
     for (const d of hourlyData) {
       const dt = new Date(d.datetime)
       const jsDay = dt.getDay()
-      const moDay = jsDay === 0 ? 6 : jsDay - 1 // 0=Mon..6=Sun
+      const moDay = jsDay === 0 ? 6 : jsDay - 1
       const hour = dt.getHours()
       grid[moDay][hour].sum += d.consumptionKwh
       grid[moDay][hour].count++
@@ -157,6 +162,29 @@ export function ConsumptionView({ hourlyData, dailyData, monthlyData }: Props) {
   const peakHour = validPattern.length ? validPattern.reduce((a, b) => b.avgKwh > a.avgKwh ? b : a) : null
   const cheapHour = validPattern.length ? validPattern.reduce((a, b) => b.avgKwh < a.avgKwh ? b : a) : null
   const avgDayKwh = hourPattern.reduce((s, h) => s + h.avgKwh, 0)
+
+  const VIEW_LABELS: Record<ViewMode, string> = {
+    hourly: t('viewHourly'),
+    daily: t('viewDaily'),
+    monthly: t('viewMonthly'),
+    pattern: t('viewPattern'),
+    heatmap: t('viewHeatmap'),
+  }
+
+  const PERIOD_NAMES: Record<number, string> = {
+    1: t('p1PatternLabel'),
+    2: t('p2PatternLabel'),
+    3: t('p3PatternLabel'),
+  }
+
+  const DAY_LABELS_SHORT = [
+    t('dayMonShort'), t('dayTueShort'), t('dayWedShort'), t('dayThuShort'),
+    t('dayFriShort'), t('daySatShort'), t('daySunShort'),
+  ]
+  const DAY_LABELS_LONG = [
+    t('dayMonLong'), t('dayTueLong'), t('dayWedLong'), t('dayThuLong'),
+    t('dayFriLong'), t('daySatLong'), t('daySunLong'),
+  ]
 
   const statRow = (stats: { label: string; val: string; unit: string; color: string }[]) => (
     <div style={{ display: 'flex', marginTop: 16, borderTop: '1px solid var(--border-subtle)' }}>
@@ -175,17 +203,17 @@ export function ConsumptionView({ hourlyData, dailyData, monthlyData }: Props) {
     <div style={{ display: 'flex', flexDirection: 'column', gap: 12 }}>
       {/* Tab bar */}
       <div style={{ display: 'flex', gap: 6, alignItems: 'center', flexWrap: 'wrap' }}>
-        {(['horaria', 'diaria', 'mensual', 'patron', 'heatmap'] as const).map(v => (
+        {(['hourly', 'daily', 'monthly', 'pattern', 'heatmap'] as const).map(v => (
           <button key={v} style={TAB_STYLE(view === v)} onClick={() => setView(v)}>
-            {v === 'patron' ? 'Patrón' : v === 'heatmap' ? 'Heatmap' : v.charAt(0).toUpperCase() + v.slice(1)}
+            {VIEW_LABELS[v]}
           </button>
         ))}
         <div style={{ flex: 1 }} />
-        {view === 'horaria' && (
-          <button style={TAB_STYLE(showPvpc)} onClick={() => setShowPvpc(p => !p)}>⟋ PVPC overlay</button>
+        {view === 'hourly' && (
+          <button style={TAB_STYLE(showPvpc)} onClick={() => setShowPvpc(p => !p)}>{t('pvpcOverlay')}</button>
         )}
-        {['horaria', 'diaria', 'mensual'].includes(view) && (
-          <button style={TAB_STYLE(false)} onClick={downloadCsv} title="Descargar CSV">
+        {['hourly', 'daily', 'monthly'].includes(view) && (
+          <button style={TAB_STYLE(false)} onClick={downloadCsv} title={t('downloadCsv')}>
             ↓ CSV
           </button>
         )}
@@ -194,12 +222,12 @@ export function ConsumptionView({ hourlyData, dailyData, monthlyData }: Props) {
       {/* Main chart card */}
       <div style={CARD}>
 
-        {/* ── Horaria ── */}
-        {view === 'horaria' && (
+        {/* ── Hourly ── */}
+        {view === 'hourly' && (
           <>
             <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 10 }}>
               <div style={{ fontSize: 10.5, fontWeight: 600, color: 'var(--dim)', textTransform: 'uppercase', letterSpacing: '0.1em' }}>
-                Consumo horario
+                {t('titleHourly')}
               </div>
               <div style={{ display: 'flex', gap: 3 }}>
                 {([7, 14, 30] as const).map(d => (
@@ -223,21 +251,20 @@ export function ConsumptionView({ hourlyData, dailyData, monthlyData }: Props) {
             <HourlyConsumptionChart data={filteredHourly} showPvpc={showPvpc} />
 
             {statRow([
-              { label: 'Total', val: totalKwh.toFixed(2), unit: 'kWh', color: 'var(--text)' },
-              { label: 'Coste estimado', val: totalCost.toFixed(3), unit: '€', color: '#34d399' },
-              { label: 'Precio medio PVPC', val: avgPvpc != null ? avgPvpc.toFixed(5) : '—', unit: '€/kWh', color: '#a78bfa' },
+              { label: t('statTotal'), val: totalKwh.toFixed(2), unit: 'kWh', color: 'var(--text)' },
+              { label: t('statCost'), val: totalCost.toFixed(3), unit: '€', color: '#34d399' },
+              { label: t('statAvgPvpc'), val: avgPvpc != null ? avgPvpc.toFixed(5) : '—', unit: '€/kWh', color: '#a78bfa' },
             ])}
 
-            {/* Period distribution */}
             {periodKwh.total > 0 && (
               <div style={{ marginTop: 14, borderTop: '1px solid var(--border-subtle)', paddingTop: 12 }}>
                 <div style={{ fontSize: 10, fontWeight: 600, color: 'var(--dim)', textTransform: 'uppercase', letterSpacing: '0.08em', marginBottom: 8 }}>
-                  Distribución por período
+                  {t('periodDistribution')}
                 </div>
                 {[
-                  { label: 'P1 Punta', kwh: periodKwh.p1, color: '#f87171' },
-                  { label: 'P2 Llano', kwh: periodKwh.p2, color: '#fbbf24' },
-                  { label: 'P3 Valle', kwh: periodKwh.p3, color: '#34d399' },
+                  { label: t('p1PatternLabel'), kwh: periodKwh.p1, color: '#f87171' },
+                  { label: t('p2PatternLabel'), kwh: periodKwh.p2, color: '#fbbf24' },
+                  { label: t('p3PatternLabel'), kwh: periodKwh.p3, color: '#34d399' },
                 ].map(({ label, kwh, color }) => {
                   const pct = (kwh / periodKwh.total) * 100
                   return (
@@ -256,17 +283,17 @@ export function ConsumptionView({ hourlyData, dailyData, monthlyData }: Props) {
           </>
         )}
 
-        {/* ── Diaria ── */}
-        {view === 'diaria' && (
+        {/* ── Daily ── */}
+        {view === 'daily' && (
           <>
             <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 12 }}>
               <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
                 <div style={{ fontSize: 10.5, fontWeight: 600, color: 'var(--dim)', textTransform: 'uppercase', letterSpacing: '0.1em' }}>
-                  Consumo diario
+                  {t('titleDaily')}
                 </div>
                 {anomalyCount > 0 && (
                   <div style={{ fontSize: 10, fontWeight: 600, color: '#f87171', background: 'rgba(248,113,113,0.12)', border: '1px solid rgba(248,113,113,0.25)', borderRadius: 5, padding: '2px 7px' }}>
-                    ⚠ {anomalyCount} anomalía{anomalyCount > 1 ? 's' : ''}
+                    {t('anomaly', { count: anomalyCount })}
                   </div>
                 )}
               </div>
@@ -278,41 +305,40 @@ export function ConsumptionView({ hourlyData, dailyData, monthlyData }: Props) {
             </div>
             <DailyConsumptionChart data={filteredDaily} />
             {statRow([
-              { label: 'Total período', val: dailyTotal.toFixed(1), unit: 'kWh', color: 'var(--text)' },
-              { label: 'Media diaria', val: filteredDaily.length ? (dailyTotal / filteredDaily.length).toFixed(2) : '—', unit: 'kWh', color: '#38bdf8' },
-              { label: 'Día máximo', val: dailyMax.toFixed(2), unit: 'kWh', color: '#fbbf24' },
+              { label: t('statTotalPeriod'), val: dailyTotal.toFixed(1), unit: 'kWh', color: 'var(--text)' },
+              { label: t('statDailyAvg'), val: filteredDaily.length ? (dailyTotal / filteredDaily.length).toFixed(2) : '—', unit: 'kWh', color: '#38bdf8' },
+              { label: t('statMaxDay'), val: dailyMax.toFixed(2), unit: 'kWh', color: '#fbbf24' },
             ])}
           </>
         )}
 
-        {/* ── Mensual ── */}
-        {view === 'mensual' && (
+        {/* ── Monthly ── */}
+        {view === 'monthly' && (
           <>
             <div style={{ fontSize: 10.5, fontWeight: 600, color: 'var(--dim)', textTransform: 'uppercase', letterSpacing: '0.1em', marginBottom: 12 }}>
-              Consumo mensual · Últimos 12 meses
+              {t('titleMonthly')}
             </div>
             <MonthlyConsumptionChart data={recent12} />
             {statRow([
-              { label: 'Total 12 meses', val: Math.round(monthlyTotal).toString(), unit: 'kWh', color: 'var(--text)' },
-              { label: 'Media mensual', val: Math.round(monthlyAvg).toString(), unit: 'kWh', color: '#38bdf8' },
-              { label: 'Mes pico', val: monthlyPeak?.month ?? '—', unit: `${Math.round(monthlyPeak?.totalKwh ?? 0)} kWh`, color: '#f87171' },
+              { label: t('statTotal12m'), val: Math.round(monthlyTotal).toString(), unit: 'kWh', color: 'var(--text)' },
+              { label: t('statMonthlyAvg'), val: Math.round(monthlyAvg).toString(), unit: 'kWh', color: '#38bdf8' },
+              { label: t('statPeakMonth'), val: monthlyPeak?.month ?? '—', unit: `${Math.round(monthlyPeak?.totalKwh ?? 0)} kWh`, color: '#f87171' },
             ])}
 
-            {/* YoY comparison */}
             {yoyComparison.some(m => m.yoyPct !== null) && (
               <div style={{ marginTop: 14, borderTop: '1px solid var(--border-subtle)', paddingTop: 12 }}>
                 <div style={{ fontSize: 10, fontWeight: 600, color: 'var(--dim)', textTransform: 'uppercase', letterSpacing: '0.08em', marginBottom: 8 }}>
-                  Variación vs año anterior
+                  {t('yoyTitle')}
                 </div>
                 <div style={{ display: 'flex', flexWrap: 'wrap', gap: 6 }}>
                   {yoyComparison.filter(m => m.yoyPct !== null).map(m => {
                     const up = (m.yoyPct ?? 0) > 0
                     const color = up ? '#f87171' : '#34d399'
                     const [, mon] = m.month.split('-')
-                    const monthNames: Record<string, string> = { '01': 'Ene', '02': 'Feb', '03': 'Mar', '04': 'Abr', '05': 'May', '06': 'Jun', '07': 'Jul', '08': 'Ago', '09': 'Sep', '10': 'Oct', '11': 'Nov', '12': 'Dic' }
+                    const monthKey = `month${mon}` as Parameters<typeof t>[0]
                     return (
                       <div key={m.month} style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 2, padding: '5px 8px', borderRadius: 6, background: 'var(--bg-inset)', minWidth: 44 }}>
-                        <span style={{ fontSize: 9.5, color: 'var(--dim)' }}>{monthNames[mon] ?? mon}</span>
+                        <span style={{ fontSize: 9.5, color: 'var(--dim)' }}>{t(monthKey)}</span>
                         <span style={{ fontSize: 11, fontWeight: 600, color, fontFamily: 'var(--font-mono)' }}>
                           {up ? '+' : ''}{(m.yoyPct ?? 0).toFixed(0)}%
                         </span>
@@ -325,13 +351,13 @@ export function ConsumptionView({ hourlyData, dailyData, monthlyData }: Props) {
           </>
         )}
 
-        {/* ── Patrón ── */}
-        {view === 'patron' && (
+        {/* ── Pattern ── */}
+        {view === 'pattern' && (
           <>
             <div style={{ fontSize: 10.5, fontWeight: 600, color: 'var(--dim)', textTransform: 'uppercase', letterSpacing: '0.1em', marginBottom: 4 }}>
-              Patrón horario · Media últimos 30 días
+              {t('titlePattern')}
             </div>
-            <div style={{ fontSize: 11, color: 'var(--dim2)', marginBottom: 12 }}>Consumo medio por hora del día</div>
+            <div style={{ fontSize: 11, color: 'var(--dim2)', marginBottom: 12 }}>{t('subtitlePattern')}</div>
             {hourlyData.length > 0 ? (
               <ResponsiveContainer width="100%" height={200}>
                 <BarChart data={hourPattern} margin={{ top: 4, right: 4, bottom: 0, left: -10 }}>
@@ -340,7 +366,7 @@ export function ConsumptionView({ hourlyData, dailyData, monthlyData }: Props) {
                   <YAxis tick={{ fontSize: 10, fill: 'var(--dim)' }} tickLine={false} axisLine={false} tickFormatter={(v: number) => v.toFixed(2)} width={36} />
                   <Tooltip
                     contentStyle={{ background: 'var(--bg2)', border: '1px solid var(--border-c)', borderRadius: 8, fontSize: 12 }}
-                    formatter={(v: number) => [`${v.toFixed(3)} kWh`, 'Media']}
+                    formatter={(v: number) => [`${v.toFixed(3)} kWh`, t('tooltipAvg')]}
                     labelStyle={{ color: 'var(--muted-c)', marginBottom: 4 }}
                   />
                   <Bar dataKey="avgKwh" radius={[3, 3, 0, 0]} maxBarSize={22}>
@@ -356,13 +382,13 @@ export function ConsumptionView({ hourlyData, dailyData, monthlyData }: Props) {
                 </BarChart>
               </ResponsiveContainer>
             ) : (
-              <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', height: 200, color: 'var(--dim)', fontSize: 13 }}>Sin datos</div>
+              <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', height: 200, color: 'var(--dim)', fontSize: 13 }}>{tc('noData')}</div>
             )}
             <div style={{ display: 'flex', gap: 12, marginTop: 8, justifyContent: 'center' }}>
               {[
-                { label: 'P1 Punta (lab.)', color: '#f87171' },
-                { label: 'P2 Llano', color: '#fbbf24' },
-                { label: 'P3 Valle', color: '#34d399' },
+                { label: t('p1PatternLabel'), color: '#f87171' },
+                { label: t('p2PatternLabel'), color: '#fbbf24' },
+                { label: t('p3PatternLabel'), color: '#34d399' },
               ].map(({ label, color }) => (
                 <div key={label} style={{ display: 'flex', alignItems: 'center', gap: 4, fontSize: 10.5, color: 'var(--muted-c)' }}>
                   <div style={{ width: 8, height: 8, borderRadius: 2, background: color, opacity: 0.8 }} />
@@ -371,16 +397,15 @@ export function ConsumptionView({ hourlyData, dailyData, monthlyData }: Props) {
               ))}
             </div>
             {statRow([
-              { label: 'Hora pico', val: peakHour?.hour ?? '—', unit: `${peakHour?.avgKwh.toFixed(3) ?? '—'} kWh`, color: '#f87171' },
-              { label: 'Media diaria', val: avgDayKwh.toFixed(2), unit: 'kWh/día', color: 'var(--text)' },
-              { label: 'Hora valle', val: cheapHour?.hour ?? '—', unit: `${cheapHour?.avgKwh.toFixed(3) ?? '—'} kWh`, color: '#34d399' },
+              { label: t('statPeakHour'), val: peakHour?.hour ?? '—', unit: `${peakHour?.avgKwh.toFixed(3) ?? '—'} kWh`, color: '#f87171' },
+              { label: t('statDailyAvg'), val: avgDayKwh.toFixed(2), unit: 'kWh/d', color: 'var(--text)' },
+              { label: t('statValleyHour'), val: cheapHour?.hour ?? '—', unit: `${cheapHour?.avgKwh.toFixed(3) ?? '—'} kWh`, color: '#34d399' },
             ])}
           </>
         )}
+
         {/* ── Heatmap ── */}
         {view === 'heatmap' && (() => {
-          const DAY_LABELS = ['Lun', 'Mar', 'Mié', 'Jue', 'Vie', 'Sáb', 'Dom']
-          const DAY_LABELS_LONG = ['Lunes', 'Martes', 'Miércoles', 'Jueves', 'Viernes', 'Sábado', 'Domingo']
           const flatAvgs = heatmapData.avgs.flat()
           const maxVal = Math.max(...flatAvgs)
           const maxIdx = flatAvgs.indexOf(maxVal)
@@ -394,10 +419,10 @@ export function ConsumptionView({ hourlyData, dailyData, monthlyData }: Props) {
           return (
             <>
               <div style={{ fontSize: 10.5, fontWeight: 600, color: 'var(--dim)', textTransform: 'uppercase', letterSpacing: '0.1em', marginBottom: 4 }}>
-                Heatmap semanal
+                {t('titleHeatmap')}
               </div>
               <div style={{ fontSize: 11, color: 'var(--dim2)', marginBottom: 14 }}>
-                Consumo medio por hora y día de la semana
+                {t('subtitleHeatmap')}
               </div>
               {hourlyData.length > 0 ? (
                 <div style={{ overflowX: 'auto' }}>
@@ -410,7 +435,7 @@ export function ConsumptionView({ hourlyData, dailyData, monthlyData }: Props) {
                         </div>
                       ))}
                     </div>
-                    {DAY_LABELS.map((day, d) => (
+                    {DAY_LABELS_SHORT.map((day, d) => (
                       <div key={day} style={{ display: 'grid', gridTemplateColumns: '28px repeat(24, 1fr)', gap: 2, marginBottom: 2 }}>
                         <div style={{ fontSize: 10, color: 'var(--dim)', display: 'flex', alignItems: 'center' }}>{day}</div>
                         {heatmapData.avgs[d].map((val, h) => {
@@ -429,21 +454,21 @@ export function ConsumptionView({ hourlyData, dailyData, monthlyData }: Props) {
                       </div>
                     ))}
                     <div style={{ display: 'flex', alignItems: 'center', gap: 4, marginTop: 10, justifyContent: 'flex-end' }}>
-                      <span style={{ fontSize: 9, color: 'var(--dim)' }}>Bajo</span>
+                      <span style={{ fontSize: 9, color: 'var(--dim)' }}>{t('heatmapLow')}</span>
                       {[0.1, 0.3, 0.5, 0.7, 0.9].map(v => (
                         <div key={v} style={{ width: 12, height: 12, borderRadius: 2, background: `rgba(96,165,250,${(0.12 + v * 0.82).toFixed(2)})` }} />
                       ))}
-                      <span style={{ fontSize: 9, color: 'var(--dim)' }}>Alto</span>
+                      <span style={{ fontSize: 9, color: 'var(--dim)' }}>{t('heatmapHigh')}</span>
                     </div>
                   </div>
                 </div>
               ) : (
-                <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', height: 160, color: 'var(--dim)', fontSize: 13 }}>Sin datos</div>
+                <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', height: 160, color: 'var(--dim)', fontSize: 13 }}>{tc('noData')}</div>
               )}
               {statRow([
-                { label: 'Día más activo', val: DAY_LABELS_LONG[maxDayIdx] ?? '—', unit: '', color: '#f87171' },
-                { label: 'Hora pico', val: `${String(peakHr).padStart(2, '0')}:00`, unit: `${maxVal.toFixed(3)} kWh`, color: '#fbbf24' },
-                { label: 'Hora global máx.', val: `${String(maxHourIdx).padStart(2, '0')}:00`, unit: '', color: '#a78bfa' },
+                { label: t('statMostActiveDay'), val: DAY_LABELS_LONG[maxDayIdx] ?? '—', unit: '', color: '#f87171' },
+                { label: t('statPeakHour'), val: `${String(peakHr).padStart(2, '0')}:00`, unit: `${maxVal.toFixed(3)} kWh`, color: '#fbbf24' },
+                { label: t('statGlobalPeakHour'), val: `${String(maxHourIdx).padStart(2, '0')}:00`, unit: '', color: '#a78bfa' },
               ])}
             </>
           )
@@ -452,14 +477,14 @@ export function ConsumptionView({ hourlyData, dailyData, monthlyData }: Props) {
       </div>
 
       {/* Hourly detail table */}
-      {view === 'horaria' && filteredHourly.length > 0 && (
+      {view === 'hourly' && filteredHourly.length > 0 && (
         <div style={CARD}>
           <div style={{ fontSize: 10.5, fontWeight: 600, color: 'var(--dim)', textTransform: 'uppercase', letterSpacing: '0.1em', marginBottom: 12 }}>
-            Detalle hora a hora
+            {t('hourlyDetail')}
           </div>
           <div className="table-scroll">
             <div style={{ display: 'grid', gridTemplateColumns: '52px 1fr 1fr 1fr 100px', minWidth: 400 }}>
-              {['Hora', 'kWh', '€/kWh', 'Coste', 'Período'].map(h => (
+              {[t('colHour'), t('colKwh'), t('colPrice'), t('colCost'), t('colPeriod')].map(h => (
                 <div key={h} style={{ fontSize: 10, fontWeight: 600, color: 'var(--dim)', textTransform: 'uppercase', letterSpacing: '0.06em', padding: '4px 8px', borderBottom: '1px solid var(--border-c)' }}>{h}</div>
               ))}
               {filteredHourly.map((d, i) => (
