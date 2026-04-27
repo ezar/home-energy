@@ -1,7 +1,7 @@
 {
   "crons": [
     { "path": "/api/cron/sync", "schedule": "0 5 * * *" },
-    { "path": "/api/cron/pvpc-alert", "schedule": "0 * * * *" }
+    { "path": "/api/cron/pvpc-alert", "schedule": "0 20 * * *" }
   ],
   "functions": {
     "app/api/datadis/sync/route.ts": { "maxDuration": 60 },

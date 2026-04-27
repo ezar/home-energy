@@ -27,7 +27,7 @@
     --radius: 0.5rem;
   }
 
-  .light {
+  [data-theme="light"] {
     --background: 240 4% 96%;
     --foreground: 240 8% 10%;
     --card: 0 0% 99%;
