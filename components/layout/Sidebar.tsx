@@ -98,6 +98,15 @@ export function Sidebar({ lastSyncAt, syncing }: SidebarProps) {
             : 'Nunca'}
         </div>
       </div>
+
+      {/* Build version */}
+      {process.env.NEXT_PUBLIC_BUILD_VERSION && (
+        <div style={{ margin: '8px 12px 0', textAlign: 'center' }}>
+          <span style={{ fontSize: 9.5, color: 'var(--dim2)', fontFamily: 'var(--font-mono)', letterSpacing: '0.04em' }}>
+            v{process.env.NEXT_PUBLIC_BUILD_VERSION}
+          </span>
+        </div>
+      )}
     </div>
   )
 }
