@@ -12,32 +12,43 @@ import { Label } from '@/components/ui/label'
 import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from '@/components/ui/card'
 import { Zap } from 'lucide-react'
 
-export default function LoginPage() {
+export default function RegisterPage() {
   const router = useRouter()
 
   const [email, setEmail] = useState('')
   const [password, setPassword] = useState('')
+  const [confirm, setConfirm] = useState('')
   const [error, setError] = useState<string | null>(null)
   const [loading, setLoading] = useState(false)
 
-  async function handleLogin(e: React.FormEvent) {
+  async function handleRegister(e: React.FormEvent) {
     e.preventDefault()
-    setLoading(true)
     setError(null)
 
+    if (password !== confirm) {
+      setError('Las contraseñas no coinciden')
+      return
+    }
+    if (password.length < 8) {
+      setError('La contraseña debe tener al menos 8 caracteres')
+      return
+    }
+
+    setLoading(true)
     const supabase = createClient()
-    const { error } = await supabase.auth.signInWithPassword({ email, password })
+    const { error } = await supabase.auth.signUp({ email, password })
 
     if (error) {
-      setError(error.message === 'Invalid login credentials'
-        ? 'Email o contraseña incorrectos'
-        : error.message
+      setError(
+        error.message === 'User already registered'
+          ? 'Ya existe una cuenta con ese email'
+          : error.message
       )
       setLoading(false)
       return
     }
 
-    router.push('/')
+    router.push('/bienvenida')
     router.refresh()
   }
 
@@ -47,11 +58,11 @@ export default function LoginPage() {
         <div className="flex justify-center mb-2">
           <Zap className="h-8 w-8 text-yellow-400" />
         </div>
-        <CardTitle>Energy Dashboard</CardTitle>
-        <CardDescription>Consumo eléctrico del hogar</CardDescription>
+        <CardTitle>Crear cuenta</CardTitle>
+        <CardDescription>Energy Dashboard — acceso familiar</CardDescription>
       </CardHeader>
       <CardContent>
-        <form onSubmit={handleLogin} className="space-y-4">
+        <form onSubmit={handleRegister} className="space-y-4">
           <div className="space-y-2">
             <Label htmlFor="email">Email</Label>
             <Input
@@ -69,25 +80,38 @@ export default function LoginPage() {
             <Input
               id="password"
               type="password"
+              placeholder="Mínimo 8 caracteres"
               value={password}
               onChange={(e) => setPassword(e.target.value)}
               required
-              autoComplete="current-password"
+              autoComplete="new-password"
+            />
+          </div>
+          <div className="space-y-2">
+            <Label htmlFor="confirm">Confirmar contraseña</Label>
+            <Input
+              id="confirm"
+              type="password"
+              placeholder="Repite la contraseña"
+              value={confirm}
+              onChange={(e) => setConfirm(e.target.value)}
+              required
+              autoComplete="new-password"
             />
           </div>
           {error && (
             <p className="text-sm text-destructive">{error}</p>
           )}
           <Button type="submit" className="w-full" disabled={loading}>
-            {loading ? 'Entrando...' : 'Entrar'}
+            {loading ? 'Creando cuenta...' : 'Crear cuenta'}
           </Button>
         </form>
       </CardContent>
       <CardFooter className="justify-center">
         <p className="text-sm text-muted-foreground">
-          ¿No tienes cuenta?{' '}
-          <Link href="/register" className="text-primary underline-offset-4 hover:underline">
-            Regístrate
+          ¿Ya tienes cuenta?{' '}
+          <Link href="/login" className="text-primary underline-offset-4 hover:underline">
+            Inicia sesión
           </Link>
         </p>
       </CardFooter>

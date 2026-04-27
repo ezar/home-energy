@@ -1,4 +1,5 @@
 import { createClient } from '@/lib/supabase/server'
+import { redirect } from 'next/navigation'
 import { Zap, DollarSign, TrendingUp, Clock } from 'lucide-react'
 import { startOfMonth, subMonths, format, subHours, startOfDay, addDays } from 'date-fns'
 import type { ConsumptionRow, PvpcPriceRow, ProfileRow, UserSupplyRow } from '@/lib/supabase/types-helper'
@@ -16,6 +17,16 @@ export default async function HomePage({ searchParams }: { searchParams: { cups?
   const supabase = await createClient()
   const { data: { user } } = await supabase.auth.getUser()
   if (!user) return null
+
+  const { data: onboardingCheck } = await supabase
+    .from('profiles')
+    .select('onboarding_completed')
+    .eq('id', user.id)
+    .single()
+
+  if (onboardingCheck && !(onboardingCheck as { onboarding_completed: boolean }).onboarding_completed) {
+    redirect('/bienvenida')
+  }
 
   const selectedCups = searchParams.cups ?? null
   const now = new Date()

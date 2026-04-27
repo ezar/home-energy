@@ -2,7 +2,7 @@
 
 import Link from 'next/link'
 import { usePathname } from 'next/navigation'
-import { Zap, BarChart3, DollarSign, TrendingUp, Settings } from 'lucide-react'
+import { Zap, BarChart3, DollarSign, TrendingUp, Settings, HelpCircle } from 'lucide-react'
 
 const navItems = [
   { href: '/',              label: 'Resumen',  icon: Zap },
@@ -10,6 +10,7 @@ const navItems = [
   { href: '/coste',         label: 'Coste',    icon: DollarSign },
   { href: '/pvpc',          label: 'PVPC',     icon: TrendingUp },
   { href: '/configuracion', label: 'Config',   icon: Settings },
+  { href: '/ayuda',         label: 'Ayuda',    icon: HelpCircle },
 ]
 
 export function BottomNav() {
