@@ -1,6 +1,6 @@
 'use client'
 
-import { useState, useMemo } from 'react'
+import { useState, useMemo, useCallback } from 'react'
 import {
   BarChart, Bar, XAxis, YAxis, CartesianGrid,
   Tooltip, ResponsiveContainer, Cell,
@@ -90,6 +90,39 @@ export function ConsumptionView({ hourlyData, dailyData, monthlyData }: Props) {
 
   const recent12 = useMemo(() => monthlyData.slice(-12), [monthlyData])
 
+  const downloadCsv = useCallback(() => {
+    let csv = ''
+    let filename = ''
+
+    if (view === 'horaria') {
+      csv = 'datetime,consumption_kwh,price_eur_kwh,cost_eur,period\n'
+      csv += filteredHourly.map(d =>
+        `${d.datetime},${d.consumptionKwh.toFixed(4)},${d.priceEurKwh?.toFixed(6) ?? ''},${d.estimatedCostEur?.toFixed(6) ?? ''},${d.period ?? ''}`
+      ).join('\n')
+      filename = `consumo-horario-${hourlyDays}d.csv`
+    } else if (view === 'diaria') {
+      csv = 'fecha,total_kwh,coste_eur,kwh_p1,kwh_p2,kwh_p3,anomalia\n'
+      csv += filteredDaily.map(d =>
+        `${d.date},${d.totalKwh.toFixed(4)},${d.estimatedCostEur.toFixed(4)},${d.kwhP1.toFixed(4)},${d.kwhP2.toFixed(4)},${d.kwhP3.toFixed(4)},${d.isAnomalous ? 'si' : 'no'}`
+      ).join('\n')
+      filename = `consumo-diario-${dailyDays}d.csv`
+    } else if (view === 'mensual') {
+      csv = 'mes,total_kwh\n'
+      csv += recent12.map(d => `${d.month},${d.totalKwh.toFixed(4)}`).join('\n')
+      filename = 'consumo-mensual.csv'
+    } else {
+      return
+    }
+
+    const blob = new Blob([csv], { type: 'text/csv;charset=utf-8;' })
+    const url = URL.createObjectURL(blob)
+    const a = document.createElement('a')
+    a.href = url
+    a.download = filename
+    a.click()
+    URL.revokeObjectURL(url)
+  }, [view, filteredHourly, filteredDaily, recent12, hourlyDays, dailyDays])
+
   const yoyComparison = useMemo(() => {
     const monthMap = new Map(monthlyData.map(m => [m.month, m.totalKwh]))
     return recent12.map(m => {
@@ -150,6 +183,11 @@ export function ConsumptionView({ hourlyData, dailyData, monthlyData }: Props) {
         <div style={{ flex: 1 }} />
         {view === 'horaria' && (
           <button style={TAB_STYLE(showPvpc)} onClick={() => setShowPvpc(p => !p)}>⟋ PVPC overlay</button>
+        )}
+        {['horaria', 'diaria', 'mensual'].includes(view) && (
+          <button style={TAB_STYLE(false)} onClick={downloadCsv} title="Descargar CSV">
+            ↓ CSV
+          </button>
         )}
       </div>
 

@@ -3,7 +3,7 @@ import { CostLineChart } from '@/components/charts/CostLineChart'
 import { TariffSimulator } from './TariffSimulator'
 import { startOfMonth, subMonths, format, getDate, getDaysInMonth } from 'date-fns'
 import { es } from 'date-fns/locale'
-import type { ConsumptionRow, PvpcPriceRow, ProfileRow } from '@/lib/supabase/types-helper'
+import type { ConsumptionRow, PvpcPriceRow, ProfileRow, MaximeterRow } from '@/lib/supabase/types-helper'
 import {
   tariffConfigFromProfile, getEnergyPrice,
   monthlyPowerCost, applyTaxes, VAT_RATE, ELECTRICITY_TAX_RATE,
@@ -26,11 +26,23 @@ export default async function CostePage() {
 
   const now = new Date()
 
-  const profileResult = await supabase
-    .from('profiles')
-    .select('tariff_type, price_p1_eur_kwh, price_p2_eur_kwh, price_p3_eur_kwh, power_kw, power_price_eur_kw_month')
-    .eq('id', user.id)
-    .single()
+  const [profileResult, maximeterResult] = await Promise.all([
+    supabase
+      .from('profiles')
+      .select('tariff_type, price_p1_eur_kwh, price_p2_eur_kwh, price_p3_eur_kwh, power_kw, power_price_eur_kw_month')
+      .eq('id', user.id)
+      .single(),
+    supabase
+      .from('maximeter')
+      .select('datetime, max_power_kw, period')
+      .eq('user_id', user.id)
+      .gte('datetime', startOfMonth(now).toISOString())
+      .order('max_power_kw', { ascending: false })
+      .limit(10),
+  ])
+
+  type MaxRow = Pick<MaximeterRow, 'datetime' | 'max_power_kw' | 'period'>
+  const maximeterRows = (maximeterResult.data ?? []) as MaxRow[]
 
   const tariffConfig = tariffConfigFromProfile(
     (profileResult.data ?? {}) as Pick<ProfileRow,
@@ -275,6 +287,73 @@ export default async function CostePage() {
             {coveragePct < 90 && (
               <p style={{ fontSize: 10.5, color: 'var(--dim2)', margin: 0 }}>
                 Cobertura de precios PVPC del {coveragePct}%. Los kWh sin precio PVPC no se incluyen en el cálculo de mercado.
+              </p>
+            )}
+          </div>
+        )
+      })()}
+
+      {/* Maxímetro */}
+      {maximeterRows.length > 0 && (() => {
+        const peak = maximeterRows[0]
+        const peakKw = peak.max_power_kw
+        const contracted = tariffConfig.powerKw ?? 0
+        const exceeded = contracted > 0 && peakKw > contracted
+        const PERIOD_NAMES_MAX: Record<number, string> = { 1: 'P1 Punta', 2: 'P2 Llano', 3: 'P3 Valle' }
+        const peakColor = exceeded ? '#f87171' : '#34d399'
+        return (
+          <div style={{ ...CARD, borderColor: exceeded ? 'rgba(248,113,113,0.3)' : 'var(--border-c)' }}>
+            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: 14 }}>
+              <div style={{ fontSize: 10.5, fontWeight: 600, color: 'var(--dim)', textTransform: 'uppercase', letterSpacing: '0.1em' }}>
+                Maxímetro · {format(now, 'MMMM yyyy', { locale: es })}
+              </div>
+              {exceeded && (
+                <div style={{ fontSize: 10.5, fontWeight: 600, color: '#f87171', background: 'rgba(248,113,113,0.1)', border: '1px solid rgba(248,113,113,0.25)', borderRadius: 6, padding: '3px 9px' }}>
+                  ⚠ Potencia excedida
+                </div>
+              )}
+            </div>
+            <div style={{ display: 'flex', gap: 12, flexWrap: 'wrap' }}>
+              <div style={{ flex: '1 1 130px', padding: '12px 14px', borderRadius: 10, background: 'var(--bg-inset)', border: `1px solid ${peakColor}30` }}>
+                <div style={{ fontSize: 10.5, color: 'var(--dim)', marginBottom: 6 }}>Pico máximo registrado</div>
+                <div style={{ fontSize: 26, fontWeight: 700, color: peakColor, fontFamily: 'var(--font-mono)', letterSpacing: '-0.02em' }}>
+                  {peakKw.toFixed(3)} <span style={{ fontSize: 13, fontWeight: 400, color: 'var(--muted-c)', fontFamily: 'var(--font-sans)' }}>kW</span>
+                </div>
+                <div style={{ fontSize: 10.5, color: 'var(--dim)', marginTop: 4 }}>
+                  {format(new Date(peak.datetime), "d MMM · HH:mm", { locale: es })}
+                  {peak.period && <span style={{ marginLeft: 6 }}>· {PERIOD_NAMES_MAX[peak.period] ?? ''}</span>}
+                </div>
+              </div>
+              {contracted > 0 && (
+                <div style={{ flex: '1 1 130px', padding: '12px 14px', borderRadius: 10, background: 'var(--bg-inset)', border: '1px solid var(--border-c)' }}>
+                  <div style={{ fontSize: 10.5, color: 'var(--dim)', marginBottom: 6 }}>Potencia contratada</div>
+                  <div style={{ fontSize: 26, fontWeight: 700, color: 'var(--text)', fontFamily: 'var(--font-mono)', letterSpacing: '-0.02em' }}>
+                    {contracted.toFixed(3)} <span style={{ fontSize: 13, fontWeight: 400, color: 'var(--muted-c)', fontFamily: 'var(--font-sans)' }}>kW</span>
+                  </div>
+                  <div style={{ fontSize: 10.5, color: exceeded ? '#f87171' : '#34d399', marginTop: 4, fontWeight: 500 }}>
+                    {exceeded
+                      ? `Exceso: +${(peakKw - contracted).toFixed(3)} kW`
+                      : `Margen: ${(contracted - peakKw).toFixed(3)} kW libre`}
+                  </div>
+                </div>
+              )}
+              <div style={{ flex: '2 1 200px', padding: '12px 14px', borderRadius: 10, background: 'var(--bg-inset)', border: '1px solid var(--border-c)', display: 'flex', flexDirection: 'column', gap: 4 }}>
+                <div style={{ fontSize: 10.5, color: 'var(--dim)', marginBottom: 2 }}>Top picos este mes</div>
+                {maximeterRows.slice(0, 5).map((r, i) => (
+                  <div key={i} style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', fontSize: 11 }}>
+                    <span style={{ color: 'var(--dim)', fontFamily: 'var(--font-mono)' }}>
+                      {format(new Date(r.datetime), 'd MMM HH:mm', { locale: es })}
+                    </span>
+                    <span style={{ color: contracted > 0 && r.max_power_kw > contracted ? '#f87171' : 'var(--text-2)', fontFamily: 'var(--font-mono)', fontWeight: 600 }}>
+                      {r.max_power_kw.toFixed(3)} kW
+                    </span>
+                  </div>
+                ))}
+              </div>
+            </div>
+            {exceeded && (
+              <p style={{ fontSize: 10.5, color: 'var(--dim2)', margin: '10px 0 0', lineHeight: 1.6 }}>
+                La potencia máxima registrada supera la contratada. Dependiendo de tu comercializadora, esto puede generar penalizaciones. Considera aumentar la potencia contratada o reducir el uso simultáneo de electrodomésticos.
               </p>
             )}
           </div>
