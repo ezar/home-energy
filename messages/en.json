@@ -180,7 +180,12 @@
     "appDishwasher": "Dishwasher",
     "appOven": "Oven",
     "appEV": "EV charge",
-    "timeNowImmediately": "right now"
+    "timeNowImmediately": "right now",
+    "periodBreakdown": "Period breakdown",
+    "dailyTrend": "Daily consumption this month",
+    "tooltipConsumption": "Consumption",
+    "tooltipDay": "Day {n}",
+    "avgDailyKwh": "Avg: {avg} kWh/day"
   },
   "Settings": {
     "profile": "Profile",

@@ -180,7 +180,12 @@
     "appDishwasher": "Lavavajillas",
     "appOven": "Horno",
     "appEV": "Carga VE",
-    "timeNowImmediately": "ahora mismo"
+    "timeNowImmediately": "ahora mismo",
+    "periodBreakdown": "Desglose por período",
+    "dailyTrend": "Consumo diario este mes",
+    "tooltipConsumption": "Consumo",
+    "tooltipDay": "Día {n}",
+    "avgDailyKwh": "Media: {avg} kWh/día"
   },
   "Settings": {
     "profile": "Perfil",

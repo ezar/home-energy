@@ -9,6 +9,7 @@ import { StatCard } from '@/components/dashboard/StatCard'
 import { ColorBadge } from '@/components/dashboard/PeriodBadge'
 import { PvpcBarChart } from '@/components/charts/PvpcBarChart'
 import { PvpcSparkline } from '@/components/charts/PvpcSparkline'
+import { HomeDailyChart } from '@/components/charts/HomeDailyChart'
 import { tariffConfigFromProfile, getEnergyPrice } from '@/lib/pricing'
 import { getPeriod } from '@/lib/tariff'
 
@@ -38,7 +39,7 @@ export default async function HomePage({ searchParams }: { searchParams: { cups?
   const startToday = startOfDay(now).toISOString()
   const endTomorrow = startOfDay(addDays(now, 2)).toISOString()
 
-  let qThisMonth = supabase.from('consumption').select('consumption_kwh').eq('user_id', user.id).gte('datetime', startThisMonth)
+  let qThisMonth = supabase.from('consumption').select('consumption_kwh, datetime').eq('user_id', user.id).gte('datetime', startThisMonth)
   if (selectedCups) qThisMonth = qThisMonth.eq('cups', selectedCups)
 
   let qLastMonth = supabase.from('consumption').select('consumption_kwh').eq('user_id', user.id).gte('datetime', startLastMonth).lt('datetime', endLastMonth)
@@ -59,7 +60,7 @@ export default async function HomePage({ searchParams }: { searchParams: { cups?
       supabase.from('user_supplies').select('cups, display_name').eq('user_id', user.id).eq('is_active', true),
     ])
 
-  type MonthRow = Pick<ConsumptionRow, 'consumption_kwh'>
+  type MonthRow = Pick<ConsumptionRow, 'consumption_kwh' | 'datetime'>
   type LatestRow = Pick<ConsumptionRow, 'datetime'>
   type PvpcRow = Pick<PvpcPriceRow, 'price_eur_kwh' | 'datetime'>
 
@@ -88,6 +89,19 @@ export default async function HomePage({ searchParams }: { searchParams: { cups?
   const avgPvpc = pvpcNow ? pvpcNow.price_eur_kwh : null
   const monthTrend = lastMonthKwh > 0 ? ((thisMonthKwh - lastMonthKwh) / lastMonthKwh) * 100 : null
   const latestDatetime = latestRows[0]?.datetime ?? null
+
+  // Period breakdown (P1/P2/P3)
+  const periodTotals: Record<1 | 2 | 3, number> = { 1: 0, 2: 0, 3: 0 }
+  const dailyMap: Record<number, number> = {}
+  for (const row of thisMonthRows) {
+    const dt = new Date(row.datetime)
+    const period = getPeriod(dt) as 1 | 2 | 3
+    periodTotals[period] += row.consumption_kwh
+    const day = dt.getDate()
+    dailyMap[day] = (dailyMap[day] ?? 0) + row.consumption_kwh
+  }
+  const dailyData = Object.entries(dailyMap).map(([day, kwh]) => ({ day: Number(day), kwh })).sort((a, b) => a.day - b.day)
+  const avgDailyKwh = dailyData.length > 0 ? dailyData.reduce((s, d) => s + d.kwh, 0) / dailyData.length : 0
 
   const pvpc24hForChart = pvpc24h.map((p, i) => ({
     hour: new Date(p.datetime).getHours(),
@@ -246,6 +260,63 @@ export default async function HomePage({ searchParams }: { searchParams: { cups?
           }
         />
       </div>
+
+      {/* Period breakdown + Daily trend */}
+      {thisMonthKwh > 0 && (
+        <div className="g2">
+          {/* Period breakdown card */}
+          <div style={{
+            background: 'var(--card-grad)', border: '1px solid var(--border-c)',
+            borderRadius: 12, padding: '14px 18px', boxShadow: 'var(--shadow-card)',
+          }}>
+            <div style={{ fontSize: 10.5, fontWeight: 600, color: 'var(--dim)', textTransform: 'uppercase', letterSpacing: '0.1em', marginBottom: 12 }}>
+              {t('periodBreakdown')}
+            </div>
+            <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
+              {([1, 2, 3] as const).map(p => {
+                const kwh = periodTotals[p]
+                const pct = thisMonthKwh > 0 ? (kwh / thisMonthKwh) * 100 : 0
+                const color = PERIOD_COLORS[p]
+                return (
+                  <div key={p}>
+                    <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 4 }}>
+                      <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
+                        <div style={{ width: 8, height: 8, borderRadius: 2, background: color, flexShrink: 0 }} />
+                        <span style={{ fontSize: 11, color: 'var(--text-2)', fontWeight: 500 }}>{PERIOD_NAMES[p]}</span>
+                      </div>
+                      <div style={{ display: 'flex', gap: 8, alignItems: 'center' }}>
+                        <span style={{ fontSize: 11, fontFamily: 'var(--font-mono)', color: 'var(--text)' }}>{kwh.toFixed(1)} kWh</span>
+                        <span style={{ fontSize: 10, color: 'var(--dim)', minWidth: 32, textAlign: 'right' }}>{pct.toFixed(0)}%</span>
+                      </div>
+                    </div>
+                    <div style={{ height: 5, background: 'var(--bg-inset)', borderRadius: 3, overflow: 'hidden' }}>
+                      <div style={{ width: `${pct}%`, height: '100%', borderRadius: 3, background: color, opacity: 0.75 }} />
+                    </div>
+                  </div>
+                )
+              })}
+            </div>
+          </div>
+
+          {/* Daily trend card */}
+          <div style={{
+            background: 'var(--card-grad)', border: '1px solid var(--border-c)',
+            borderRadius: 12, padding: '14px 18px', boxShadow: 'var(--shadow-card)',
+          }}>
+            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 10 }}>
+              <div style={{ fontSize: 10.5, fontWeight: 600, color: 'var(--dim)', textTransform: 'uppercase', letterSpacing: '0.1em' }}>
+                {t('dailyTrend')}
+              </div>
+              {avgDailyKwh > 0 && (
+                <span style={{ fontSize: 10.5, color: 'var(--dim2)', fontFamily: 'var(--font-mono)' }}>
+                  {t('avgDailyKwh', { avg: avgDailyKwh.toFixed(1) })}
+                </span>
+              )}
+            </div>
+            <HomeDailyChart data={dailyData} avgKwh={avgDailyKwh} />
+          </div>
+        </div>
+      )}
 
       {/* Objetivo mensual */}
       {profile?.monthly_kwh_target && profile.monthly_kwh_target > 0 && (() => {
