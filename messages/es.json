@@ -62,7 +62,7 @@
     "lightMode": "Modo claro",
     "darkMode": "Modo oscuro",
     "signOut": "Cerrar sesión",
-    "switchLang": "Switch to English",
+    "switchLang": "Cambiar a inglés",
     "summaryTitle": "Resumen",
     "summarySub": "Vista general del mes",
     "consumptionTitle": "Consumo",
@@ -261,6 +261,10 @@
     "errorConnection": "Error de conexión",
     "errorNetwork": "Error de red",
     "unknownError": "Error desconocido",
+    "validationPriceRequired": "Indica los precios P1, P2 y P3 para la tarifa fija",
+    "validationPricePositive": "Los precios deben ser mayores que cero",
+    "validationCupsFormat": "El CUPS debe empezar por ES y tener entre 20 y 22 caracteres",
+    "validationDistributorFormat": "El código de distribuidora debe ser numérico",
     "datadisNote": "Datadis puede tener hasta 2 días de retraso y limita a ~1 petición/día por endpoint. Si ves error 429, espera 24h. El cron automático se ejecuta a las 05:00."
   },
   "Cost": {

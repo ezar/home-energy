@@ -58,7 +58,7 @@ export function ConfigForm({ profile, supplies: initialSupplies }: ConfigFormPro
   const supabase = createClient()
 
   const [datadisUsername, setDatadisUsername] = useState(profile?.datadis_username ?? '')
-  const [datadisPassword, setDatadisPassword] = useState('')
+  const passwordRef = useRef<HTMLInputElement>(null)
   const [showPassword, setShowPassword] = useState(false)
   const [authorizedNif, setAuthorizedNif] = useState(profile?.datadis_authorized_nif ?? '')
   const [cups, setCups] = useState(profile?.cups ?? '')
@@ -90,8 +90,32 @@ export function ConfigForm({ profile, supplies: initialSupplies }: ConfigFormPro
 
   async function handleSave(e: React.FormEvent) {
     e.preventDefault()
-    setSaving(true)
     setSaveMsg(null)
+
+    // Validation
+    if (tariffType === 'fixed') {
+      const p1 = parseFloat(priceP1)
+      const p2 = parseFloat(priceP2)
+      const p3 = parseFloat(priceP3)
+      if (isNaN(p1) || isNaN(p2) || isNaN(p3)) {
+        setSaveMsg({ ok: false, text: t('validationPriceRequired') })
+        return
+      }
+      if (p1 <= 0 || p2 <= 0 || p3 <= 0) {
+        setSaveMsg({ ok: false, text: t('validationPricePositive') })
+        return
+      }
+    }
+    if (cups && !/^ES.{18,20}$/i.test(cups.trim())) {
+      setSaveMsg({ ok: false, text: t('validationCupsFormat') })
+      return
+    }
+    if (distributorCode && !/^\d+$/.test(distributorCode.trim())) {
+      setSaveMsg({ ok: false, text: t('validationDistributorFormat') })
+      return
+    }
+
+    setSaving(true)
 
     const updates: Record<string, unknown> = {
       display_name: displayName || null,
@@ -117,19 +141,20 @@ export function ConfigForm({ profile, supplies: initialSupplies }: ConfigFormPro
       return
     }
 
-    if (datadisPassword) {
+    const newPassword = passwordRef.current?.value ?? ''
+    if (newPassword) {
       const res = await fetch('/api/datadis/credentials', {
         method: 'PATCH',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ password: datadisPassword }),
+        body: JSON.stringify({ password: newPassword }),
       })
+      if (passwordRef.current) passwordRef.current.value = ''
       if (!res.ok) {
         const d = await res.json().catch(() => ({})) as { error?: string }
         setSaveMsg({ ok: false, text: d.error ?? t('errorSavingPassword') })
         setSaving(false)
         return
       }
-      setDatadisPassword('')
     }
 
     setSaveMsg({ ok: true, text: t('saved') })
@@ -329,10 +354,9 @@ export function ConfigForm({ profile, supplies: initialSupplies }: ConfigFormPro
                 </label>
                 <div style={{ position: 'relative' }}>
                   <input
+                    ref={passwordRef}
                     style={{ ...INPUT, paddingRight: 36 }}
                     type={showPassword ? 'text' : 'password'}
-                    value={datadisPassword}
-                    onChange={e => setDatadisPassword(e.target.value)}
                     placeholder={profile?.datadis_password_encrypted ? t('passwordSavedPlaceholder') : t('newPasswordPlaceholder')}
                     autoComplete="new-password"
                   />
