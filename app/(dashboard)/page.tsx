@@ -12,6 +12,7 @@ import { PvpcSparkline } from '@/components/charts/PvpcSparkline'
 import { HomeDailyChart } from '@/components/charts/HomeDailyChart'
 import { tariffConfigFromProfile, getEnergyPrice } from '@/lib/pricing'
 import { getPeriod } from '@/lib/tariff'
+import { PERIOD_COLORS, COLOR_SUCCESS, COLOR_DANGER, COLOR_WARNING, COLOR_INFO, COLOR_PURPLE, COLOR_CYAN } from '@/lib/constants'
 
 export const dynamic = 'force-dynamic'
 
@@ -81,7 +82,6 @@ export default async function HomePage({ searchParams }: { searchParams: { cups?
   const currentPeriod = getPeriod(now)
   const currentPeriodPrice = getEnergyPrice(currentPeriod, pvpcNow?.price_eur_kwh ?? null, tariffConfig)
   const PERIOD_NAMES: Record<number, string> = { 1: tp('1'), 2: tp('2'), 3: tp('3') }
-  const PERIOD_COLORS: Record<number, string> = { 1: '#f87171', 2: '#fbbf24', 3: '#34d399' }
 
   const thisMonthKwh = thisMonthRows.reduce((s, r) => s + r.consumption_kwh, 0)
   const lastMonthKwh = lastMonthRows.reduce((s, r) => s + r.consumption_kwh, 0)
@@ -139,10 +139,10 @@ export default async function HomePage({ searchParams }: { searchParams: { cups?
 
   type Appliance = { name: string; duration: number; icon: string; color: string }
   const APPLIANCES: Appliance[] = [
-    { name: t('appWasher'),     duration: 2, icon: '◎', color: '#60a5fa' },
-    { name: t('appDishwasher'), duration: 1, icon: '◈', color: '#34d399' },
-    { name: t('appOven'),       duration: 1, icon: '▣', color: '#fbbf24' },
-    { name: t('appEV'),         duration: 4, icon: '⏣', color: '#a78bfa' },
+    { name: t('appWasher'),     duration: 2, icon: '◎', color: COLOR_INFO },
+    { name: t('appDishwasher'), duration: 1, icon: '◈', color: COLOR_SUCCESS },
+    { name: t('appOven'),       duration: 1, icon: '▣', color: COLOR_WARNING },
+    { name: t('appEV'),         duration: 4, icon: '⏣', color: COLOR_PURPLE },
   ]
 
   const applianceSuggestions = upcomingPvpc.length > 0
@@ -168,7 +168,7 @@ export default async function HomePage({ searchParams }: { searchParams: { cups?
           meta={
             <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
               {monthTrend !== null && (
-                <ColorBadge color={monthTrend > 0 ? '#f87171' : '#34d399'}>
+                <ColorBadge color={monthTrend > 0 ? COLOR_DANGER : COLOR_SUCCESS}>
                   {monthTrend > 0 ? '↑' : '↓'} {Math.abs(monthTrend).toFixed(1)}%
                 </ColorBadge>
               )}
@@ -204,9 +204,9 @@ export default async function HomePage({ searchParams }: { searchParams: { cups?
           const priceVal = currentPeriodPrice > 0 ? currentPeriodPrice.toFixed(5) : '—'
           const periodColor = PERIOD_COLORS[currentPeriod]
           const cheapness = avgPvpc24h && pvpcNow
-            ? pvpcNow.price_eur_kwh < avgPvpc24h * 0.85 ? { label: t('cheap'), color: '#34d399' }
-            : pvpcNow.price_eur_kwh > avgPvpc24h * 1.15 ? { label: t('expensive'), color: '#f87171' }
-            : { label: t('normal'), color: '#fbbf24' }
+            ? pvpcNow.price_eur_kwh < avgPvpc24h * 0.85 ? { label: t('cheap'), color: COLOR_SUCCESS }
+            : pvpcNow.price_eur_kwh > avgPvpc24h * 1.15 ? { label: t('expensive'), color: COLOR_DANGER }
+            : { label: t('normal'), color: COLOR_WARNING }
             : null
           return (
             <StatCard
@@ -232,8 +232,8 @@ export default async function HomePage({ searchParams }: { searchParams: { cups?
                   )}
                   {!isFixed && (
                     <div style={{ display: 'flex', justifyContent: 'space-between' }}>
-                      {cheapHour !== null && <span style={{ fontSize: 10.5, color: '#34d399', fontFamily: 'var(--font-mono)' }}>↓ {cheapHour}:00</span>}
-                      {expHour !== null && <span style={{ fontSize: 10.5, color: '#f87171', fontFamily: 'var(--font-mono)' }}>↑ {expHour}:00</span>}
+                      {cheapHour !== null && <span style={{ fontSize: 10.5, color: COLOR_SUCCESS, fontFamily: 'var(--font-mono)' }}>↓ {cheapHour}:00</span>}
+                      {expHour !== null && <span style={{ fontSize: 10.5, color: COLOR_DANGER, fontFamily: 'var(--font-mono)' }}>↑ {expHour}:00</span>}
                     </div>
                   )}
                 </div>
@@ -246,11 +246,11 @@ export default async function HomePage({ searchParams }: { searchParams: { cups?
         <StatCard
           label={t('lastData')}
           value={latestDatetime ? format(new Date(latestDatetime), 'dd MMM HH:mm') : tc('noData')}
-          icon={<Clock size={14} color="#38bdf8" />}
+          icon={<Clock size={14} color=COLOR_CYAN />}
           iconBg="rgba(56,189,248,0.1)"
           meta={
             <div style={{ display: 'flex', gap: 6, flexWrap: 'wrap', marginTop: 4 }}>
-              {profile?.distributor_code && <ColorBadge color="#38bdf8">Dist. {profile.distributor_code}</ColorBadge>}
+              {profile?.distributor_code && <ColorBadge color=COLOR_CYAN>Dist. {profile.distributor_code}</ColorBadge>}
               {profile?.cups && (
                 <div style={{ fontSize: 10, color: 'var(--dim2)', fontFamily: 'var(--font-mono)', wordBreak: 'break-all', lineHeight: 1.5, marginTop: 4 }}>
                   {profile.cups}
@@ -326,7 +326,7 @@ export default async function HomePage({ searchParams }: { searchParams: { cups?
         const daysElapsed = now.getDate()
         const projected = daysElapsed > 0 ? (thisMonthKwh / daysElapsed) * daysInMonth : 0
         const willExceed = projected > target
-        const barColor = pct > 100 ? '#f87171' : pct > 80 ? '#fbbf24' : '#34d399'
+        const barColor = pct > 100 ? COLOR_DANGER : pct > 80 ? COLOR_WARNING : COLOR_SUCCESS
         return (
           <div style={{
             background: 'var(--card-grad)', border: `1px solid ${pct > 100 ? 'rgba(248,113,113,0.3)' : 'var(--border-c)'}`,
@@ -344,7 +344,7 @@ export default async function HomePage({ searchParams }: { searchParams: { cups?
                 </div>
               </div>
               {willExceed && (
-                <div style={{ fontSize: 10.5, padding: '4px 10px', borderRadius: 6, background: 'rgba(248,113,113,0.12)', color: '#f87171', border: '1px solid rgba(248,113,113,0.25)', fontWeight: 500, flexShrink: 0 }}>
+                <div style={{ fontSize: 10.5, padding: '4px 10px', borderRadius: 6, background: 'rgba(248,113,113,0.12)', color: COLOR_DANGER, border: '1px solid rgba(248,113,113,0.25)', fontWeight: 500, flexShrink: 0 }}>
                   {t('forecast', { value: projected.toFixed(0) })}
                 </div>
               )}
@@ -396,11 +396,11 @@ export default async function HomePage({ searchParams }: { searchParams: { cups?
                     <span style={{ fontFamily: 'var(--font-mono)', fontSize: 16, fontWeight: 700, color: 'var(--text)' }}>
                       {String(dt.getHours()).padStart(2, '0')}:00
                     </span>
-                    <span style={{ fontSize: 9.5, color: isNow ? '#34d399' : '#60a5fa', fontWeight: 500 }}>
+                    <span style={{ fontSize: 9.5, color: isNow ? COLOR_SUCCESS : COLOR_INFO, fontWeight: 500 }}>
                       {timeLabel}
                     </span>
                   </div>
-                  <div style={{ fontSize: 13, fontFamily: 'var(--font-mono)', fontWeight: 600, color: '#34d399', marginBottom: 4 }}>
+                  <div style={{ fontSize: 13, fontFamily: 'var(--font-mono)', fontWeight: 600, color: COLOR_SUCCESS, marginBottom: 4 }}>
                     {p.price_eur_kwh.toFixed(5)} €/kWh
                   </div>
                   <div style={{ display: 'flex', alignItems: 'center', gap: 4 }}>
@@ -431,7 +431,7 @@ export default async function HomePage({ searchParams }: { searchParams: { cups?
               return (
                 <div key={s.name} style={{
                   flex: '1 1 140px', padding: '10px 12px', borderRadius: 8,
-                  background: `rgba(${s.color === '#60a5fa' ? '96,165,250' : s.color === '#34d399' ? '52,211,153' : s.color === '#fbbf24' ? '251,191,36' : '167,139,250'},0.06)`,
+                  background: `rgba(${s.color === COLOR_INFO ? '96,165,250' : s.color === COLOR_SUCCESS ? '52,211,153' : s.color === COLOR_WARNING ? '251,191,36' : '167,139,250'},0.06)`,
                   border: `1px solid ${s.color}30`,
                 }}>
                   <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 5 }}>
@@ -441,7 +441,7 @@ export default async function HomePage({ searchParams }: { searchParams: { cups?
                   <div style={{ fontFamily: 'var(--font-mono)', fontSize: 13, fontWeight: 700, color: 'var(--text)', marginBottom: 3 }}>
                     {String(s.start.getHours()).padStart(2, '0')}:00–{String(endHour.getHours()).padStart(2, '0')}:00
                   </div>
-                  <div style={{ fontSize: 11, color: '#34d399', fontFamily: 'var(--font-mono)', marginBottom: 3 }}>
+                  <div style={{ fontSize: 11, color: COLOR_SUCCESS, fontFamily: 'var(--font-mono)', marginBottom: 3 }}>
                     {s.avgPrice.toFixed(5)} €/kWh
                   </div>
                   <div style={{ fontSize: 10, color: 'var(--dim2)' }}>
@@ -469,9 +469,9 @@ export default async function HomePage({ searchParams }: { searchParams: { cups?
             </div>
             <div style={{ display: 'flex', gap: 16 }}>
               {[
-                { label: t('min'), val: minPvpc?.toFixed(4), color: '#34d399' },
-                { label: t('max'), val: maxPvpc?.toFixed(4), color: '#f87171' },
-                { label: t('avg'), val: avgPvpc24h?.toFixed(4), color: '#a78bfa' },
+                { label: t('min'), val: minPvpc?.toFixed(4), color: COLOR_SUCCESS },
+                { label: t('max'), val: maxPvpc?.toFixed(4), color: COLOR_DANGER },
+                { label: t('avg'), val: avgPvpc24h?.toFixed(4), color: COLOR_PURPLE },
               ].map(s => (
                 <div key={s.label} style={{ textAlign: 'right' }}>
                   <div style={{ fontSize: 9.5, color: 'var(--dim)' }}>{s.label}</div>

@@ -5,8 +5,7 @@ import {
   Tooltip, ResponsiveContainer, Cell,
 } from 'recharts'
 import type { ChartDataPoint } from '@/lib/types/consumption'
-
-const PERIOD_COLORS: Record<number, string> = { 1: '#f87171', 2: '#fbbf24', 3: '#34d399' }
+import { PERIOD_COLORS, COLOR_SUCCESS, COLOR_PURPLE } from '@/lib/constants'
 
 function CustomTooltip({ active, payload, label }: any) {
   if (!active || !payload?.length) return null
@@ -18,8 +17,8 @@ function CustomTooltip({ active, payload, label }: any) {
     }}>
       <div style={{ color: 'var(--muted-c)', marginBottom: 6 }}>{label}</div>
       <div style={{ color: 'var(--text)', fontFamily: 'var(--font-mono)' }}>{d?.consumptionKwh?.toFixed(3)} kWh</div>
-      {d?.priceEurKwh != null && <div style={{ color: '#a78bfa', fontFamily: 'var(--font-mono)' }}>{d.priceEurKwh.toFixed(5)} €/kWh</div>}
-      {d?.estimatedCostEur != null && <div style={{ color: '#34d399', fontFamily: 'var(--font-mono)' }}>{d.estimatedCostEur.toFixed(4)} €</div>}
+      {d?.priceEurKwh != null && <div style={{ color: COLOR_PURPLE, fontFamily: 'var(--font-mono)' }}>{d.priceEurKwh.toFixed(5)} €/kWh</div>}
+      {d?.estimatedCostEur != null && <div style={{ color: COLOR_SUCCESS, fontFamily: 'var(--font-mono)' }}>{d.estimatedCostEur.toFixed(4)} €</div>}
     </div>
   )
 }
