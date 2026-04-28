@@ -2,6 +2,7 @@
 
 import { useState } from 'react'
 import { useTranslations } from 'next-intl'
+import { PERIOD_COLORS as PC, COLOR_SUCCESS, COLOR_DANGER } from '@/lib/constants'
 
 interface MonthData {
   label: string
@@ -29,7 +30,7 @@ const INPUT: React.CSSProperties = {
   fontFamily: 'var(--font-mono)', width: '100%', outline: 'none',
 }
 
-const PERIOD_COLORS: Record<string, string> = { p1: '#f87171', p2: '#fbbf24', p3: '#34d399' }
+const PERIOD_COLORS: Record<string, string> = { p1: PC[1], p2: PC[2], p3: PC[3] }
 
 export function TariffSimulator({ months, currentP1, currentP2, currentP3 }: Props) {
   const t = useTranslations('TariffSimulator')
@@ -99,7 +100,7 @@ export function TariffSimulator({ months, currentP1, currentP2, currentP3 }: Pro
               <div key={h} style={{ fontSize: 9.5, fontWeight: 600, color: 'var(--dim)', textTransform: 'uppercase', letterSpacing: '0.06em', padding: '3px 8px', borderBottom: '1px solid var(--border-c)', textAlign: h === t('colMonth') ? 'left' : 'right' }}>{h}</div>
             ))}
             {simResults.map((m, i) => {
-              const diffColor = m.diff > 0.005 ? '#f87171' : m.diff < -0.005 ? '#34d399' : 'var(--dim)'
+              const diffColor = m.diff > 0.005 ? COLOR_DANGER : m.diff < -0.005 ? COLOR_SUCCESS : 'var(--dim)'
               return [
                 <div key={`l${i}`} style={{ padding: '6px 8px', borderBottom: '1px solid var(--border-subtle)', fontSize: 12, color: 'var(--text-2)', fontWeight: 500 }}>
                   {m.label.split(' ')[0]}
@@ -119,8 +120,8 @@ export function TariffSimulator({ months, currentP1, currentP2, currentP3 }: Pro
 
           <div style={{ display: 'flex', gap: 10, flexWrap: 'wrap', paddingTop: 10, borderTop: '1px solid var(--border-subtle)' }}>
             {[
-              { label: t('totalMonths', { months: months.length }), val: `${totalDiff > 0 ? '+' : ''}${totalDiff.toFixed(2)} €`, color: totalDiff > 0.01 ? '#f87171' : totalDiff < -0.01 ? '#34d399' : 'var(--dim)' },
-              { label: t('annualProjection'), val: `${annualDiff > 0 ? '+' : ''}${annualDiff.toFixed(2)} €/año`, color: annualDiff > 0.01 ? '#f87171' : annualDiff < -0.01 ? '#34d399' : 'var(--dim)' },
+              { label: t('totalMonths', { months: months.length }), val: `${totalDiff > 0 ? '+' : ''}${totalDiff.toFixed(2)} €`, color: totalDiff > 0.01 ? COLOR_DANGER : totalDiff < -0.01 ? COLOR_SUCCESS : 'var(--dim)' },
+              { label: t('annualProjection'), val: `${annualDiff > 0 ? '+' : ''}${annualDiff.toFixed(2)} €/año`, color: annualDiff > 0.01 ? COLOR_DANGER : annualDiff < -0.01 ? COLOR_SUCCESS : 'var(--dim)' },
             ].map(({ label, val, color }) => (
               <div key={label} style={{ flex: '1 1 140px', padding: '10px 14px', borderRadius: 8, background: 'var(--bg-inset)', border: '1px solid var(--border-c)' }}>
                 <div style={{ fontSize: 10, color: 'var(--dim)', marginBottom: 4 }}>{label}</div>

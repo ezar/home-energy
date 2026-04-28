@@ -1,8 +1,7 @@
 'use client'
 
 import { useTranslations } from 'next-intl'
-
-const PERIOD_COLORS: Record<number, string> = { 1: '#f87171', 2: '#fbbf24', 3: '#34d399' }
+import { PERIOD_COLORS } from '@/lib/constants'
 
 interface PeriodBadgeProps {
   period: 1 | 2 | 3
