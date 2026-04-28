@@ -118,21 +118,28 @@ export default async function HomePage({ searchParams }: { searchParams: { cups?
   const upcomingPvpc = pvpcToday.filter(p => new Date(p.datetime) >= nowRounded)
   const bestHoursToday = [...upcomingPvpc].sort((a, b) => a.price_eur_kwh - b.price_eur_kwh).slice(0, 3)
 
-  // Find best consecutive window of given duration in upcoming hours
+  // Sliding-window O(n): timestamps parsed once, consecutive flags precomputed,
+  // running sum updated incrementally — avoids O(n²) of the naïve slice approach.
   function findBestWindow(hours: PvpcRow[], duration: number): { start: Date; avgPrice: number } | null {
     if (hours.length < duration) return null
+    const ms = hours.map(h => new Date(h.datetime).getTime())
+    // consec[i] = true when hour i is exactly 1h after hour i-1
+    const consec = ms.map((t, i) => i === 0 || Math.abs((t - ms[i - 1]) / 3600000 - 1) <= 0.1)
+
+    let windowSum = hours.slice(0, duration).reduce((s, h) => s + h.price_eur_kwh, 0)
     let bestAvg = Infinity
     let bestStart: Date | null = null
+
     for (let i = 0; i <= hours.length - duration; i++) {
-      const window = hours.slice(i, i + duration)
-      let consecutive = true
-      for (let j = 1; j < window.length; j++) {
-        const diff = (new Date(window[j].datetime).getTime() - new Date(window[j - 1].datetime).getTime()) / 3600000
-        if (Math.abs(diff - 1) > 0.1) { consecutive = false; break }
+      if (i > 0) windowSum += hours[i + duration - 1].price_eur_kwh - hours[i - 1].price_eur_kwh
+      // Verify all hours in window are consecutive (max 4 iterations for longest appliance)
+      let ok = true
+      for (let j = i + 1; j < i + duration; j++) {
+        if (!consec[j]) { ok = false; break }
       }
-      if (!consecutive) continue
-      const avg = window.reduce((s, h) => s + h.price_eur_kwh, 0) / duration
-      if (avg < bestAvg) { bestAvg = avg; bestStart = new Date(window[0].datetime) }
+      if (!ok) continue
+      const avg = windowSum / duration
+      if (avg < bestAvg) { bestAvg = avg; bestStart = new Date(hours[i].datetime) }
     }
     return bestStart ? { start: bestStart, avgPrice: bestAvg } : null
   }

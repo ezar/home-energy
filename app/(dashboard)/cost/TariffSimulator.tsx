@@ -40,9 +40,9 @@ export function TariffSimulator({ months, currentP1, currentP2, currentP3 }: Pro
   const [simP2, setSimP2] = useState(String(currentP2?.toFixed(5) ?? ''))
   const [simP3, setSimP3] = useState(String(currentP3?.toFixed(5) ?? ''))
 
-  const p1 = parseFloat(simP1) || 0
-  const p2 = parseFloat(simP2) || 0
-  const p3 = parseFloat(simP3) || 0
+  const p1 = Math.max(0, parseFloat(simP1) || 0)
+  const p2 = Math.max(0, parseFloat(simP2) || 0)
+  const p3 = Math.max(0, parseFloat(simP3) || 0)
   const hasValues = p1 > 0 || p2 > 0 || p3 > 0
 
   const simResults = months.map(m => {
@@ -83,9 +83,13 @@ export function TariffSimulator({ months, currentP1, currentP2, currentP3 }: Pro
               type="number"
               step="0.00001"
               min="0"
+              max="9.99999"
               placeholder="0.00000"
               value={val}
-              onChange={e => set(e.target.value)}
+              onChange={e => {
+                const v = parseFloat(e.target.value)
+                set(isNaN(v) ? '' : String(Math.max(0, Math.min(9.99999, v))))
+              }}
               style={INPUT}
             />
             <div style={{ fontSize: 9.5, color: 'var(--dim2)', marginTop: 3 }}>€/kWh</div>
