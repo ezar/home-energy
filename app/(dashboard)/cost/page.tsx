@@ -11,14 +11,10 @@ import {
   monthlyPowerCost, applyTaxes, VAT_RATE, ELECTRICITY_TAX_RATE,
 } from '@/lib/pricing'
 import { PERIOD_COLORS, COLOR_SUCCESS, COLOR_DANGER } from '@/lib/constants'
+import { CARD_STYLE as CARD } from '@/lib/ui-styles'
 
 export const dynamic = 'force-dynamic'
 const PERIOD_NAMES_STATIC: Record<number, string> = { 1: 'P1 Punta', 2: 'P2 Llano', 3: 'P3 Valle' }
-
-const CARD = {
-  background: 'var(--card-grad)', border: '1px solid var(--border-c)',
-  borderRadius: 12, padding: '16px 18px', boxShadow: 'var(--shadow-card)',
-}
 
 export default async function CostePage({ searchParams }: { searchParams: { cups?: string } }) {
   const supabase = await createClient()

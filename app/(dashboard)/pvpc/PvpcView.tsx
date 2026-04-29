@@ -8,11 +8,7 @@ import {
 import { PeriodBadge, ColorBadge } from '@/components/dashboard/PeriodBadge'
 import type { ChartDataPoint, TariffPeriod } from '@/lib/types/consumption'
 import { PERIOD_COLORS, COLOR_SUCCESS, COLOR_DANGER, COLOR_PURPLE, COLOR_CYAN } from '@/lib/constants'
-
-const CARD = {
-  background: 'var(--card-grad)', border: '1px solid var(--border-c)',
-  borderRadius: 12, padding: '16px 18px', boxShadow: 'var(--shadow-card)',
-}
+import { CARD_STYLE as CARD } from '@/lib/ui-styles'
 
 interface Props {
   data: ChartDataPoint[]

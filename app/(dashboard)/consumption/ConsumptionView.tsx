@@ -12,11 +12,7 @@ import { MonthlyConsumptionChart } from '@/components/charts/MonthlyConsumptionC
 import { PeriodBadge } from '@/components/dashboard/PeriodBadge'
 import type { ChartDataPoint, DailySummary, MonthlySummary, TariffPeriod } from '@/lib/types/consumption'
 import { PERIOD_COLORS, COLOR_SUCCESS, COLOR_DANGER, COLOR_WARNING, COLOR_INFO } from '@/lib/constants'
-
-const CARD: React.CSSProperties = {
-  background: 'var(--card-grad)', border: '1px solid var(--border-c)',
-  borderRadius: 12, padding: '16px 18px', boxShadow: 'var(--shadow-card)',
-}
+import { CARD_STYLE as CARD } from '@/lib/ui-styles'
 
 const TAB_STYLE = (active: boolean): React.CSSProperties => ({
   padding: '5px 12px', borderRadius: 8, cursor: 'pointer', fontSize: 12, fontWeight: active ? 500 : 400,

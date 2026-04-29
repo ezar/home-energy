@@ -1,6 +1,7 @@
 import { createClient } from '@/lib/supabase/server'
 import { redirect } from 'next/navigation'
 import { DashboardShell } from '@/components/layout/DashboardShell'
+import type { ProfileRow } from '@/lib/supabase/types-helper'
 
 export default async function DashboardLayout({ children }: { children: React.ReactNode }) {
   const supabase = await createClient()
@@ -13,7 +14,7 @@ export default async function DashboardLayout({ children }: { children: React.Re
     .eq('id', user.id)
     .single()
 
-  const lastSyncAt = (profileRaw as { last_sync_at: string | null } | null)?.last_sync_at ?? null
+  const lastSyncAt = (profileRaw as Pick<ProfileRow, 'last_sync_at'> | null)?.last_sync_at ?? null
 
   return (
     <DashboardShell lastSyncAt={lastSyncAt}>

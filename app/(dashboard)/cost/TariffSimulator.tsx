@@ -3,6 +3,7 @@
 import { useState } from 'react'
 import { useTranslations } from 'next-intl'
 import { PERIOD_COLORS as PC, COLOR_SUCCESS, COLOR_DANGER } from '@/lib/constants'
+import { CARD_STYLE, INPUT_STYLE } from '@/lib/ui-styles'
 
 interface MonthData {
   label: string
@@ -19,16 +20,8 @@ interface Props {
   currentP3: number | null
 }
 
-const CARD: React.CSSProperties = {
-  background: 'var(--card-grad)', border: '1px solid var(--border-c)',
-  borderRadius: 12, padding: '16px 18px', boxShadow: 'var(--shadow-card)',
-}
-
-const INPUT: React.CSSProperties = {
-  background: 'var(--input-bg)', border: '1px solid var(--input-border)',
-  borderRadius: 6, padding: '6px 10px', fontSize: 13, color: 'var(--text)',
-  fontFamily: 'var(--font-mono)', width: '100%', outline: 'none',
-}
+const CARD = CARD_STYLE
+const INPUT: React.CSSProperties = { ...INPUT_STYLE, borderRadius: 6, padding: '6px 10px', fontFamily: 'var(--font-mono)' }
 
 const PERIOD_COLORS: Record<string, string> = { p1: PC[1], p2: PC[2], p3: PC[3] }
 

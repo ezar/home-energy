@@ -6,8 +6,11 @@ import type { RedataResponse, PvpcPrice } from '@/lib/types/redata'
 const BASE_URL = 'https://apidatos.ree.es/es/datos'
 const PVPC_ENDPOINT = '/mercados/precios-mercados-tiempo-real'
 
-// ID del indicador PVPC peninsular
+// Indicador PVPC peninsular — cambiar GEO_ID y GEO_LIMIT para Baleares (8742) o Canarias (8743)
 const PVPC_INDICATOR_ID = '1001'
+const GEO_LIMIT = 'peninsular'
+const GEO_ID = '8741'
+const GEO_TRUNC = 'electric_system'
 
 function formatDateParam(date: Date): string {
   const pad = (n: number) => String(n).padStart(2, '0')
@@ -19,9 +22,9 @@ async function fetchPvpcChunk(startDate: Date, endDate: Date): Promise<PvpcPrice
   url.searchParams.set('start_date', formatDateParam(startDate))
   url.searchParams.set('end_date', formatDateParam(endDate))
   url.searchParams.set('time_trunc', 'hour')
-  url.searchParams.set('geo_trunc', 'electric_system')
-  url.searchParams.set('geo_limit', 'peninsular')
-  url.searchParams.set('geo_ids', '8741')
+  url.searchParams.set('geo_trunc', GEO_TRUNC)
+  url.searchParams.set('geo_limit', GEO_LIMIT)
+  url.searchParams.set('geo_ids', GEO_ID)
 
   const res = await fetch(url.toString(), {
     headers: { Accept: 'application/json' },
