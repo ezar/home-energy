@@ -87,6 +87,8 @@ export function ConfigForm({ profile, supplies: initialSupplies }: ConfigFormPro
   const [syncLogs, setSyncLogs] = useState<LogEntry[]>([])
   const logIdRef = useRef(0)
   const logBoxRef = useRef<HTMLDivElement>(null)
+  const testAbortRef = useRef<AbortController | null>(null)
+  const syncAbortRef = useRef<AbortController | null>(null)
 
   async function handleSave(e: React.FormEvent) {
     e.preventDefault()
@@ -162,13 +164,17 @@ export function ConfigForm({ profile, supplies: initialSupplies }: ConfigFormPro
   }
 
   async function handleTestConnection() {
+    testAbortRef.current?.abort()
+    const controller = new AbortController()
+    testAbortRef.current = controller
     setTesting(true)
     setTestResult(null)
     try {
-      const res = await fetch('/api/datadis/supplies')
+      const res = await fetch('/api/datadis/supplies', { signal: controller.signal })
       const data = await res.json()
       setTestResult(res.ok ? { ok: true, supplies: data.supplies ?? [] } : { ok: false, error: data.error ?? t('errorConnection') })
-    } catch {
+    } catch (err) {
+      if (err instanceof Error && err.name === 'AbortError') return
       setTestResult({ ok: false, error: t('errorNetwork') })
     } finally {
       setTesting(false)
@@ -176,10 +182,13 @@ export function ConfigForm({ profile, supplies: initialSupplies }: ConfigFormPro
   }
 
   async function handleSyncDatadis() {
+    syncAbortRef.current?.abort()
+    const controller = new AbortController()
+    syncAbortRef.current = controller
     setSyncingDatadis(true)
     setSyncLogs([])
     try {
-      const res = await fetch('/api/datadis/sync', { method: 'POST' })
+      const res = await fetch('/api/datadis/sync', { method: 'POST', signal: controller.signal })
       if (!res.body) throw new Error('Sin respuesta del servidor')
 
       const reader = res.body.getReader()
@@ -200,7 +209,8 @@ export function ConfigForm({ profile, supplies: initialSupplies }: ConfigFormPro
           } catch { /* ignore malformed */ }
         }
       }
-    } catch {
+    } catch (err) {
+      if (err instanceof Error && err.name === 'AbortError') return
       setSyncLogs(prev => [...prev, { id: ++logIdRef.current, type: 'error', msg: t('errorNetwork') }])
     } finally {
       setSyncingDatadis(false)
@@ -208,10 +218,13 @@ export function ConfigForm({ profile, supplies: initialSupplies }: ConfigFormPro
   }
 
   async function handleSyncPvpc() {
+    syncAbortRef.current?.abort()
+    const controller = new AbortController()
+    syncAbortRef.current = controller
     setSyncingPvpc(true)
     setSyncLogs([])
     try {
-      const res = await fetch('/api/pvpc/sync', { method: 'POST' })
+      const res = await fetch('/api/pvpc/sync', { method: 'POST', signal: controller.signal })
       if (!res.body) throw new Error('Sin respuesta del servidor')
 
       const reader = res.body.getReader()
@@ -232,7 +245,8 @@ export function ConfigForm({ profile, supplies: initialSupplies }: ConfigFormPro
           } catch { /* ignore malformed */ }
         }
       }
-    } catch {
+    } catch (err) {
+      if (err instanceof Error && err.name === 'AbortError') return
       setSyncLogs(prev => [...prev, { id: ++logIdRef.current, type: 'error', msg: t('errorNetwork') }])
     } finally {
       setSyncingPvpc(false)
