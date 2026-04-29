@@ -265,7 +265,12 @@
     "validationPricePositive": "Los precios deben ser mayores que cero",
     "validationCupsFormat": "El CUPS debe empezar por ES y tener entre 20 y 22 caracteres",
     "validationDistributorFormat": "El código de distribuidora debe ser numérico",
-    "datadisNote": "Datadis puede tener hasta 2 días de retraso y limita a ~1 petición/día por endpoint. Si ves error 429, espera 24h. El cron automático se ejecuta a las 05:00."
+    "datadisNote": "Datadis puede tener hasta 2 días de retraso y limita a ~1 petición/día por endpoint. Si ves error 429, espera 24h. El cron automático se ejecuta a las 05:00.",
+    "dangerZone": "Zona de peligro",
+    "deleteDataDesc": "Elimina permanentemente todo tu historial de consumo, suministros y cuenta. Esta acción no se puede deshacer.",
+    "deleteData": "Borrar todos mis datos",
+    "deleteDataConfirm": "¿Seguro? Esto eliminará todo tu historial de consumo y tu cuenta. No se puede deshacer.",
+    "deleting": "Eliminando..."
   },
   "Cost": {
     "energyNoTax": "Energía (sin impuestos)",

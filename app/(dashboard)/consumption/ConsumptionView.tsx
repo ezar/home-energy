@@ -2,13 +2,11 @@
 
 import { useState, useMemo, useCallback } from 'react'
 import { useTranslations } from 'next-intl'
-import {
-  BarChart, Bar, XAxis, YAxis, CartesianGrid,
-  Tooltip, ResponsiveContainer, Cell,
-} from 'recharts'
 import { HourlyConsumptionChart } from '@/components/charts/HourlyConsumptionChart'
 import { DailyConsumptionChart } from '@/components/charts/DailyConsumptionChart'
 import { MonthlyConsumptionChart } from '@/components/charts/MonthlyConsumptionChart'
+import { ConsumptionHeatmap } from '@/components/charts/ConsumptionHeatmap'
+import { ConsumptionPattern } from '@/components/charts/ConsumptionPattern'
 import { PeriodBadge } from '@/components/dashboard/PeriodBadge'
 import type { ChartDataPoint, DailySummary, MonthlySummary, TariffPeriod } from '@/lib/types/consumption'
 import { PERIOD_COLORS, COLOR_SUCCESS, COLOR_DANGER, COLOR_WARNING, COLOR_INFO } from '@/lib/constants'
@@ -152,11 +150,6 @@ export function ConsumptionView({ hourlyData, dailyData, monthlyData }: Props) {
     const max = Math.max(...avgs.flat(), 0.001)
     return { avgs, max }
   }, [hourlyData])
-
-  const validPattern = hourPattern.filter(h => h.avgKwh > 0)
-  const peakHour = validPattern.length ? validPattern.reduce((a, b) => b.avgKwh > a.avgKwh ? b : a) : null
-  const cheapHour = validPattern.length ? validPattern.reduce((a, b) => b.avgKwh < a.avgKwh ? b : a) : null
-  const avgDayKwh = hourPattern.reduce((s, h) => s + h.avgKwh, 0)
 
   const VIEW_LABELS: Record<ViewMode, string> = {
     hourly: t('viewHourly'),
@@ -348,126 +341,18 @@ export function ConsumptionView({ hourlyData, dailyData, monthlyData }: Props) {
 
         {/* ── Pattern ── */}
         {view === 'pattern' && (
-          <>
-            <div style={{ fontSize: 10.5, fontWeight: 600, color: 'var(--dim)', textTransform: 'uppercase', letterSpacing: '0.1em', marginBottom: 4 }}>
-              {t('titlePattern')}
-            </div>
-            <div style={{ fontSize: 11, color: 'var(--dim2)', marginBottom: 12 }}>{t('subtitlePattern')}</div>
-            {hourlyData.length > 0 ? (
-              <ResponsiveContainer width="100%" height={200}>
-                <BarChart data={hourPattern} margin={{ top: 4, right: 4, bottom: 0, left: -10 }}>
-                  <CartesianGrid strokeDasharray="3 3" stroke="var(--grid-line)" vertical={false} />
-                  <XAxis dataKey="hour" tick={{ fontSize: 10, fill: 'var(--dim)' }} tickLine={false} axisLine={false} interval={2} />
-                  <YAxis tick={{ fontSize: 10, fill: 'var(--dim)' }} tickLine={false} axisLine={false} tickFormatter={(v: number) => v.toFixed(2)} width={36} />
-                  <Tooltip
-                    contentStyle={{ background: 'var(--bg2)', border: '1px solid var(--border-c)', borderRadius: 8, fontSize: 12 }}
-                    formatter={(v: number) => [`${v.toFixed(3)} kWh`, t('tooltipAvg')]}
-                    labelStyle={{ color: 'var(--muted-c)', marginBottom: 4 }}
-                  />
-                  <Bar dataKey="avgKwh" radius={[3, 3, 0, 0]} maxBarSize={22}>
-                    {hourPattern.map((_, i) => {
-                      const color = (i >= 10 && i < 14) || (i >= 18 && i < 22)
-                        ? COLOR_DANGER
-                        : (i >= 8 && i < 10) || (i >= 14 && i < 18) || i >= 22
-                          ? COLOR_WARNING
-                          : COLOR_SUCCESS
-                      return <Cell key={i} fill={color} fillOpacity={0.8} />
-                    })}
-                  </Bar>
-                </BarChart>
-              </ResponsiveContainer>
-            ) : (
-              <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', height: 200, color: 'var(--dim)', fontSize: 13 }}>{tc('noData')}</div>
-            )}
-            <div style={{ display: 'flex', gap: 12, marginTop: 8, justifyContent: 'center' }}>
-              {[
-                { label: t('p1PatternLabel'), color: COLOR_DANGER },
-                { label: t('p2PatternLabel'), color: COLOR_WARNING },
-                { label: t('p3PatternLabel'), color: COLOR_SUCCESS },
-              ].map(({ label, color }) => (
-                <div key={label} style={{ display: 'flex', alignItems: 'center', gap: 4, fontSize: 10.5, color: 'var(--muted-c)' }}>
-                  <div style={{ width: 8, height: 8, borderRadius: 2, background: color, opacity: 0.8 }} />
-                  {label}
-                </div>
-              ))}
-            </div>
-            {statRow([
-              { label: t('statPeakHour'), val: peakHour?.hour ?? '—', unit: `${peakHour?.avgKwh.toFixed(3) ?? '—'} kWh`, color: COLOR_DANGER },
-              { label: t('statDailyAvg'), val: avgDayKwh.toFixed(2), unit: 'kWh/d', color: 'var(--text)' },
-              { label: t('statValleyHour'), val: cheapHour?.hour ?? '—', unit: `${cheapHour?.avgKwh.toFixed(3) ?? '—'} kWh`, color: COLOR_SUCCESS },
-            ])}
-          </>
+          <ConsumptionPattern hourPattern={hourPattern} statRow={statRow} />
         )}
 
         {/* ── Heatmap ── */}
-        {view === 'heatmap' && (() => {
-          const flatAvgs = heatmapData.avgs.flat()
-          const maxVal = Math.max(...flatAvgs)
-          const maxIdx = flatAvgs.indexOf(maxVal)
-          const peakDay = Math.floor(maxIdx / 24)
-          const peakHr = maxIdx % 24
-          const dayTotals = heatmapData.avgs.map(row => row.reduce((s, v) => s + v, 0))
-          const maxDayIdx = dayTotals.indexOf(Math.max(...dayTotals))
-          const hourTotals = Array.from({ length: 24 }, (_, h) => heatmapData.avgs.reduce((s, row) => s + row[h], 0))
-          const maxHourIdx = hourTotals.indexOf(Math.max(...hourTotals))
-
-          return (
-            <>
-              <div style={{ fontSize: 10.5, fontWeight: 600, color: 'var(--dim)', textTransform: 'uppercase', letterSpacing: '0.1em', marginBottom: 4 }}>
-                {t('titleHeatmap')}
-              </div>
-              <div style={{ fontSize: 11, color: 'var(--dim2)', marginBottom: 14 }}>
-                {t('subtitleHeatmap')}
-              </div>
-              {hourlyData.length > 0 ? (
-                <div style={{ overflowX: 'auto' }}>
-                  <div style={{ minWidth: 500, userSelect: 'none' }}>
-                    <div style={{ display: 'grid', gridTemplateColumns: '28px repeat(24, 1fr)', gap: 2, marginBottom: 4 }}>
-                      <div />
-                      {Array.from({ length: 24 }, (_, h) => (
-                        <div key={h} style={{ fontSize: 9, color: 'var(--dim)', textAlign: 'center' }}>
-                          {h % 6 === 0 ? `${h}h` : ''}
-                        </div>
-                      ))}
-                    </div>
-                    {DAY_LABELS_SHORT.map((day, d) => (
-                      <div key={day} style={{ display: 'grid', gridTemplateColumns: '28px repeat(24, 1fr)', gap: 2, marginBottom: 2 }}>
-                        <div style={{ fontSize: 10, color: 'var(--dim)', display: 'flex', alignItems: 'center' }}>{day}</div>
-                        {heatmapData.avgs[d].map((val, h) => {
-                          const intensity = val / heatmapData.max
-                          const bg = intensity < 0.01
-                            ? 'var(--bg-inset)'
-                            : `rgba(96,165,250,${(0.12 + intensity * 0.82).toFixed(2)})`
-                          return (
-                            <div
-                              key={h}
-                              title={val > 0 ? `${day} ${String(h).padStart(2, '0')}:00 — ${val.toFixed(3)} kWh` : undefined}
-                              style={{ aspectRatio: '1/1', borderRadius: 2, background: bg, cursor: val > 0 ? 'help' : 'default' }}
-                            />
-                          )
-                        })}
-                      </div>
-                    ))}
-                    <div style={{ display: 'flex', alignItems: 'center', gap: 4, marginTop: 10, justifyContent: 'flex-end' }}>
-                      <span style={{ fontSize: 9, color: 'var(--dim)' }}>{t('heatmapLow')}</span>
-                      {[0.1, 0.3, 0.5, 0.7, 0.9].map(v => (
-                        <div key={v} style={{ width: 12, height: 12, borderRadius: 2, background: `rgba(96,165,250,${(0.12 + v * 0.82).toFixed(2)})` }} />
-                      ))}
-                      <span style={{ fontSize: 9, color: 'var(--dim)' }}>{t('heatmapHigh')}</span>
-                    </div>
-                  </div>
-                </div>
-              ) : (
-                <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', height: 160, color: 'var(--dim)', fontSize: 13 }}>{tc('noData')}</div>
-              )}
-              {statRow([
-                { label: t('statMostActiveDay'), val: DAY_LABELS_LONG[maxDayIdx] ?? '—', unit: '', color: COLOR_DANGER },
-                { label: t('statPeakHour'), val: `${String(peakHr).padStart(2, '0')}:00`, unit: `${maxVal.toFixed(3)} kWh`, color: COLOR_WARNING },
-                { label: t('statGlobalPeakHour'), val: `${String(maxHourIdx).padStart(2, '0')}:00`, unit: '', color: '#a78bfa' },
-              ])}
-            </>
-          )
-        })()}
+        {view === 'heatmap' && (
+          <ConsumptionHeatmap
+            data={heatmapData}
+            dayLabelsShort={DAY_LABELS_SHORT}
+            dayLabelsLong={DAY_LABELS_LONG}
+            statRow={statRow}
+          />
+        )}
 
       </div>
 

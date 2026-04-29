@@ -51,6 +51,9 @@ export function ConfigForm({ profile, supplies: initialSupplies }: ConfigFormPro
   const [pushLoading, setPushLoading] = useState(false)
   const [pushMsg, setPushMsg] = useState<{ ok: boolean; text: string } | null>(null)
 
+  const [deleting, setDeleting] = useState(false)
+  const [deleteMsg, setDeleteMsg] = useState<string | null>(null)
+
   const [saving, setSaving] = useState(false)
   const [testing, setTesting] = useState(false)
   const [syncingDatadis, setSyncingDatadis] = useState(false)
@@ -294,6 +297,25 @@ export function ConfigForm({ profile, supplies: initialSupplies }: ConfigFormPro
       setPushMsg({ ok: false, text: err instanceof Error ? err.message : t('unknownError') })
     } finally {
       setPushLoading(false)
+    }
+  }
+
+  async function handleDeleteData() {
+    if (!window.confirm(t('deleteDataConfirm'))) return
+    setDeleting(true)
+    setDeleteMsg(null)
+    try {
+      const res = await fetch('/api/user/delete', { method: 'DELETE' })
+      if (!res.ok) {
+        const d = await res.json().catch(() => ({})) as { error?: string }
+        setDeleteMsg(d.error ?? t('errorNetwork'))
+      } else {
+        window.location.href = '/login'
+      }
+    } catch {
+      setDeleteMsg(t('errorNetwork'))
+    } finally {
+      setDeleting(false)
     }
   }
 
@@ -655,6 +677,30 @@ export function ConfigForm({ profile, supplies: initialSupplies }: ConfigFormPro
           <p style={{ fontSize: 11, color: 'var(--dim2)', lineHeight: 1.65, margin: 0 }}>
             {t('datadisNote')}
           </p>
+        </div>
+
+        {/* Danger zone */}
+        <div style={{ padding: '12px 14px', borderRadius: 10, border: '1px solid rgba(248,113,113,0.25)', background: 'rgba(248,113,113,0.04)' }}>
+          <div style={{ fontSize: 10.5, fontWeight: 600, color: '#f87171', textTransform: 'uppercase', letterSpacing: '0.1em', marginBottom: 8 }}>
+            {t('dangerZone')}
+          </div>
+          <p style={{ fontSize: 11, color: 'var(--dim2)', lineHeight: 1.6, margin: '0 0 10px 0' }}>
+            {t('deleteDataDesc')}
+          </p>
+          <div style={{ display: 'flex', alignItems: 'center', gap: 10, flexWrap: 'wrap' }}>
+            <button
+              type="button"
+              style={{ padding: '6px 14px', borderRadius: 8, cursor: 'pointer', fontSize: 12, fontWeight: 500, background: 'rgba(248,113,113,0.12)', color: '#f87171', border: '1px solid rgba(248,113,113,0.25)', fontFamily: 'var(--font-sans)', display: 'flex', alignItems: 'center', gap: 6 }}
+              onClick={handleDeleteData}
+              disabled={deleting}
+            >
+              {deleting && <Loader2 size={12} className="spin" />}
+              {deleting ? t('deleting') : t('deleteData')}
+            </button>
+            {deleteMsg && (
+              <span style={{ fontSize: 12, color: '#f87171' }}>{deleteMsg}</span>
+            )}
+          </div>
         </div>
       </div>
     </div>
