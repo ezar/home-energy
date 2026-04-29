@@ -3,10 +3,11 @@
 import { AreaChart, Area, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer } from 'recharts'
 
 interface CostPoint { day: number; cumCost: number }
-interface Props { data: CostPoint[]; height?: number }
+interface Props { data: CostPoint[]; height?: number; ariaLabel?: string }
 
-export function CostLineChart({ data, height = 130 }: Props) {
+export function CostLineChart({ data, height = 130, ariaLabel = 'Gráfico de coste acumulado' }: Props) {
   return (
+    <div role="img" aria-label={ariaLabel}>
     <ResponsiveContainer width="100%" height={height}>
       <AreaChart data={data} margin={{ top: 4, right: 8, bottom: 0, left: -10 }}>
         <defs>
@@ -27,5 +28,6 @@ export function CostLineChart({ data, height = 130 }: Props) {
         <Area dataKey="cumCost" stroke="#34d399" strokeWidth={2} fill="url(#cost-green)" />
       </AreaChart>
     </ResponsiveContainer>
+    </div>
   )
 }

@@ -3,10 +3,11 @@
 import { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer } from 'recharts'
 
 interface PvpcDataPoint { hour: number; price: number }
-interface Props { data: PvpcDataPoint[]; height?: number }
+interface Props { data: PvpcDataPoint[]; height?: number; ariaLabel?: string }
 
-export function PvpcBarChart({ data, height = 130 }: Props) {
+export function PvpcBarChart({ data, height = 130, ariaLabel = 'Gráfico de precio PVPC por hora' }: Props) {
   return (
+    <div role="img" aria-label={ariaLabel}>
     <ResponsiveContainer width="100%" height={height}>
       <BarChart data={data} margin={{ top: 4, right: 8, bottom: 0, left: -10 }}>
         <defs>
@@ -27,5 +28,6 @@ export function PvpcBarChart({ data, height = 130 }: Props) {
         <Bar dataKey="price" fill="url(#pvpc-amber)" radius={[2, 2, 0, 0]} maxBarSize={24} />
       </BarChart>
     </ResponsiveContainer>
+    </div>
   )
 }

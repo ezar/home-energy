@@ -26,9 +26,10 @@ function CustomTooltip({ active, payload, label }: any) {
 interface Props {
   data: ChartDataPoint[]
   showPvpc?: boolean
+  ariaLabel?: string
 }
 
-export function HourlyConsumptionChart({ data, showPvpc }: Props) {
+export function HourlyConsumptionChart({ data, showPvpc, ariaLabel = 'Gráfico de consumo horario' }: Props) {
   if (!data.length) return (
     <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', height: 180, color: 'var(--dim)', fontSize: 13 }}>
       Sin datos
@@ -36,6 +37,7 @@ export function HourlyConsumptionChart({ data, showPvpc }: Props) {
   )
 
   return (
+    <div role="img" aria-label={ariaLabel}>
     <ResponsiveContainer width="100%" height={180}>
       <ComposedChart data={data} margin={{ top: 4, right: showPvpc ? 44 : 8, bottom: 0, left: -10 }}>
         <defs>
@@ -64,5 +66,6 @@ export function HourlyConsumptionChart({ data, showPvpc }: Props) {
         )}
       </ComposedChart>
     </ResponsiveContainer>
+    </div>
   )
 }

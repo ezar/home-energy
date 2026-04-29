@@ -7,6 +7,7 @@ import { Loader2, CheckCircle2, AlertCircle, ShieldCheck, Eye, EyeOff, RefreshCw
 import type { ProfileRow, UserSupplyRow } from '@/lib/supabase/types-helper'
 import type { DatadisSupply } from '@/lib/types/datadis'
 import { ColorBadge } from '@/components/dashboard/PeriodBadge'
+import { CARD_STYLE as CARD, INPUT_STYLE as INPUT, LABEL_STYLE as LABEL, SECTION_LABEL_STYLE as SECTION_LABEL, BTN_DEFAULT_STYLE as BTN_DEFAULT, BTN_PRIMARY_STYLE as BTN_PRIMARY } from '@/lib/ui-styles'
 
 type LogEntry = { id: number; type: string; msg: string }
 
@@ -22,34 +23,6 @@ function urlBase64ToUint8Array(base64: string): ArrayBuffer {
 interface ConfigFormProps {
   profile: ProfileRow | null
   supplies: UserSupplyRow[]
-}
-
-const LABEL: React.CSSProperties = { fontSize: 11, color: 'var(--muted-c)', fontWeight: 500, display: 'block', marginBottom: 5 }
-const INPUT: React.CSSProperties = {
-  width: '100%', padding: '8px 12px', borderRadius: 8,
-  background: 'var(--input-bg)', border: '1px solid var(--input-border)',
-  color: 'var(--text)', fontSize: 13, fontFamily: 'var(--font-sans)', outline: 'none',
-}
-const CARD: React.CSSProperties = {
-  background: 'var(--card-grad)', border: '1px solid var(--border-c)',
-  borderRadius: 12, padding: '16px 18px', boxShadow: 'var(--shadow-card)',
-}
-const BTN_DEFAULT: React.CSSProperties = {
-  display: 'inline-flex', alignItems: 'center', justifyContent: 'center', gap: 6,
-  padding: '7px 14px', borderRadius: 8, cursor: 'pointer',
-  background: 'var(--btn-bg)', color: 'var(--btn-text)', border: '1px solid var(--btn-border)',
-  fontSize: 12, fontWeight: 500, fontFamily: 'var(--font-sans)', transition: 'all 0.15s',
-}
-const BTN_PRIMARY: React.CSSProperties = {
-  display: 'inline-flex', alignItems: 'center', justifyContent: 'center', gap: 6,
-  padding: '7px 14px', borderRadius: 8, cursor: 'pointer',
-  background: 'linear-gradient(135deg, #f59e0b, #f97316)', color: '#0f0f11',
-  border: 'none', fontSize: 12, fontWeight: 600, fontFamily: 'var(--font-sans)',
-  boxShadow: '0 2px 12px rgba(245,158,11,0.3)', transition: 'all 0.15s',
-}
-const SECTION_LABEL: React.CSSProperties = {
-  fontSize: 10.5, fontWeight: 600, color: 'var(--dim)',
-  textTransform: 'uppercase', letterSpacing: '0.1em', marginBottom: 12,
 }
 
 export function ConfigForm({ profile, supplies: initialSupplies }: ConfigFormProps) {
