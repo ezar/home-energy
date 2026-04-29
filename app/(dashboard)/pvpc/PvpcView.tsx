@@ -57,7 +57,7 @@ export function PvpcView({ data, avgPricePaid, avgMarketPrice }: Props) {
             {t('title')}
           </div>
           <div style={{ display: 'flex', gap: 10 }}>
-            {[1, 2, 3].map(p => (
+            {([1, 2, 3] as const).map(p => (
               <div key={p} style={{ display: 'flex', alignItems: 'center', gap: 4, fontSize: 10.5, color: 'var(--muted-c)' }}>
                 <div style={{ width: 8, height: 8, borderRadius: 2, background: PERIOD_COLORS[p] }} />
                 {PERIOD_NAMES[p]}
@@ -73,7 +73,7 @@ export function PvpcView({ data, avgPricePaid, avgMarketPrice }: Props) {
           <ResponsiveContainer width="100%" height={200}>
             <ComposedChart data={data} margin={{ top: 4, right: 48, bottom: 0, left: -10 }}>
               <defs>
-                {[1, 2, 3].map(p => (
+                {([1, 2, 3] as const).map(p => (
                   <linearGradient key={p} id={`pvpc-bar-${p}`} x1="0" y1="0" x2="0" y2="1">
                     <stop offset="0%" stopColor={PERIOD_COLORS[p]} stopOpacity={0.95} />
                     <stop offset="100%" stopColor={PERIOD_COLORS[p]} stopOpacity={0.45} />

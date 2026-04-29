@@ -16,6 +16,12 @@ import { PERIOD_COLORS, COLOR_SUCCESS, COLOR_DANGER, COLOR_WARNING, COLOR_INFO, 
 
 export const dynamic = 'force-dynamic'
 
+type MonthRow = Pick<ConsumptionRow, 'consumption_kwh' | 'datetime'>
+type LatestRow = Pick<ConsumptionRow, 'datetime'>
+type PvpcRow = Pick<PvpcPriceRow, 'price_eur_kwh' | 'datetime'>
+type Appliance = { name: string; duration: number; icon: string; color: string }
+type ApplianceSuggestion = Appliance & { start: Date; avgPrice: number }
+
 export default async function HomePage({ searchParams }: { searchParams: { cups?: string } }) {
   const supabase = await createClient()
   const { data: { user } } = await supabase.auth.getUser()
@@ -60,10 +66,6 @@ export default async function HomePage({ searchParams }: { searchParams: { cups?
       supabase.from('pvpc_prices').select('price_eur_kwh, datetime').gte('datetime', startToday).lt('datetime', endTomorrow).order('datetime', { ascending: true }),
       supabase.from('user_supplies').select('cups, display_name').eq('user_id', user.id).eq('is_active', true),
     ])
-
-  type MonthRow = Pick<ConsumptionRow, 'consumption_kwh' | 'datetime'>
-  type LatestRow = Pick<ConsumptionRow, 'datetime'>
-  type PvpcRow = Pick<PvpcPriceRow, 'price_eur_kwh' | 'datetime'>
 
   const profile = profileResult.data as Pick<ProfileRow, 'last_sync_at' | 'cups' | 'distributor_code' | 'tariff_type' | 'price_p1_eur_kwh' | 'price_p2_eur_kwh' | 'price_p3_eur_kwh' | 'power_kw' | 'power_price_eur_kw_month' | 'monthly_kwh_target'> | null
   const thisMonthRows = (thisMonthResult.data ?? []) as MonthRow[]
@@ -144,7 +146,6 @@ export default async function HomePage({ searchParams }: { searchParams: { cups?
     return bestStart ? { start: bestStart, avgPrice: bestAvg } : null
   }
 
-  type Appliance = { name: string; duration: number; icon: string; color: string }
   const APPLIANCES: Appliance[] = [
     { name: t('appWasher'),     duration: 2, icon: '◎', color: COLOR_INFO },
     { name: t('appDishwasher'), duration: 1, icon: '◈', color: COLOR_SUCCESS },
@@ -156,7 +157,7 @@ export default async function HomePage({ searchParams }: { searchParams: { cups?
     ? APPLIANCES.map(a => {
         const win = findBestWindow(upcomingPvpc, a.duration)
         return win ? { ...a, ...win } : null
-      }).filter((s): s is Appliance & { start: Date; avgPrice: number } => s !== null)
+      }).filter((s): s is ApplianceSuggestion => s !== null)
     : []
 
   return (
@@ -253,11 +254,11 @@ export default async function HomePage({ searchParams }: { searchParams: { cups?
         <StatCard
           label={t('lastData')}
           value={latestDatetime ? format(new Date(latestDatetime), 'dd MMM HH:mm') : tc('noData')}
-          icon={<Clock size={14} color=COLOR_CYAN />}
+          icon={<Clock size={14} color={COLOR_CYAN} />}
           iconBg="rgba(56,189,248,0.1)"
           meta={
             <div style={{ display: 'flex', gap: 6, flexWrap: 'wrap', marginTop: 4 }}>
-              {profile?.distributor_code && <ColorBadge color=COLOR_CYAN>Dist. {profile.distributor_code}</ColorBadge>}
+              {profile?.distributor_code && <ColorBadge color={COLOR_CYAN}>Dist. {profile.distributor_code}</ColorBadge>}
               {profile?.cups && (
                 <div style={{ fontSize: 10, color: 'var(--dim2)', fontFamily: 'var(--font-mono)', wordBreak: 'break-all', lineHeight: 1.5, marginTop: 4 }}>
                   {profile.cups}
