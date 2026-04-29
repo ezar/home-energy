@@ -5,8 +5,7 @@ import {
   Tooltip, ResponsiveContainer, Cell,
 } from 'recharts'
 import type { ChartDataPoint } from '@/lib/types/consumption'
-
-const PERIOD_COLORS: Record<number, string> = { 1: '#f87171', 2: '#fbbf24', 3: '#34d399' }
+import { PERIOD_COLORS, COLOR_SUCCESS, COLOR_PURPLE } from '@/lib/constants'
 
 function CustomTooltip({ active, payload, label }: any) {
   if (!active || !payload?.length) return null
@@ -18,8 +17,8 @@ function CustomTooltip({ active, payload, label }: any) {
     }}>
       <div style={{ color: 'var(--muted-c)', marginBottom: 6 }}>{label}</div>
       <div style={{ color: 'var(--text)', fontFamily: 'var(--font-mono)' }}>{d?.consumptionKwh?.toFixed(3)} kWh</div>
-      {d?.priceEurKwh != null && <div style={{ color: '#a78bfa', fontFamily: 'var(--font-mono)' }}>{d.priceEurKwh.toFixed(5)} €/kWh</div>}
-      {d?.estimatedCostEur != null && <div style={{ color: '#34d399', fontFamily: 'var(--font-mono)' }}>{d.estimatedCostEur.toFixed(4)} €</div>}
+      {d?.priceEurKwh != null && <div style={{ color: COLOR_PURPLE, fontFamily: 'var(--font-mono)' }}>{d.priceEurKwh.toFixed(5)} €/kWh</div>}
+      {d?.estimatedCostEur != null && <div style={{ color: COLOR_SUCCESS, fontFamily: 'var(--font-mono)' }}>{d.estimatedCostEur.toFixed(4)} €</div>}
     </div>
   )
 }
@@ -27,9 +26,10 @@ function CustomTooltip({ active, payload, label }: any) {
 interface Props {
   data: ChartDataPoint[]
   showPvpc?: boolean
+  ariaLabel?: string
 }
 
-export function HourlyConsumptionChart({ data, showPvpc }: Props) {
+export function HourlyConsumptionChart({ data, showPvpc, ariaLabel = 'Gráfico de consumo horario' }: Props) {
   if (!data.length) return (
     <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', height: 180, color: 'var(--dim)', fontSize: 13 }}>
       Sin datos
@@ -37,10 +37,11 @@ export function HourlyConsumptionChart({ data, showPvpc }: Props) {
   )
 
   return (
+    <div role="img" aria-label={ariaLabel}>
     <ResponsiveContainer width="100%" height={180}>
       <ComposedChart data={data} margin={{ top: 4, right: showPvpc ? 44 : 8, bottom: 0, left: -10 }}>
         <defs>
-          {[1, 2, 3].map(p => (
+          {([1, 2, 3] as const).map(p => (
             <linearGradient key={p} id={`hbar-${p}`} x1="0" y1="0" x2="0" y2="1">
               <stop offset="0%" stopColor={PERIOD_COLORS[p]} stopOpacity={0.95} />
               <stop offset="100%" stopColor={PERIOD_COLORS[p]} stopOpacity={0.45} />
@@ -65,5 +66,6 @@ export function HourlyConsumptionChart({ data, showPvpc }: Props) {
         )}
       </ComposedChart>
     </ResponsiveContainer>
+    </div>
   )
 }

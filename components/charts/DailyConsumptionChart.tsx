@@ -5,7 +5,7 @@ import type { DailySummary } from '@/lib/types/consumption'
 import { format, parseISO } from 'date-fns'
 import { es } from 'date-fns/locale'
 
-interface Props { data: DailySummary[] }
+interface Props { data: DailySummary[]; ariaLabel?: string }
 
 function CustomTooltip({ active, payload, label }: any) {
   if (!active || !payload?.length) return null
@@ -24,7 +24,7 @@ function CustomTooltip({ active, payload, label }: any) {
   )
 }
 
-export function DailyConsumptionChart({ data }: Props) {
+export function DailyConsumptionChart({ data, ariaLabel = 'Gráfico de consumo diario' }: Props) {
   if (!data.length) return (
     <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', height: 280, color: 'var(--dim)', fontSize: 13 }}>
       Sin datos
@@ -34,6 +34,7 @@ export function DailyConsumptionChart({ data }: Props) {
   const chartData = data.map(d => ({ ...d, label: format(parseISO(d.date), 'd MMM', { locale: es }) }))
 
   return (
+    <div role="img" aria-label={ariaLabel}>
     <ResponsiveContainer width="100%" height={280}>
       <BarChart data={chartData} margin={{ top: 4, right: 8, bottom: 4, left: -10 }}>
         <defs>
@@ -57,5 +58,6 @@ export function DailyConsumptionChart({ data }: Props) {
         </Bar>
       </BarChart>
     </ResponsiveContainer>
+    </div>
   )
 }

@@ -10,16 +10,11 @@ import {
   tariffConfigFromProfile, getEnergyPrice,
   monthlyPowerCost, applyTaxes, VAT_RATE, ELECTRICITY_TAX_RATE,
 } from '@/lib/pricing'
+import { PERIOD_COLORS, COLOR_SUCCESS, COLOR_DANGER } from '@/lib/constants'
+import { CARD_STYLE as CARD } from '@/lib/ui-styles'
 
 export const dynamic = 'force-dynamic'
-
-const PERIOD_COLORS: Record<number, string> = { 1: '#f87171', 2: '#fbbf24', 3: '#34d399' }
 const PERIOD_NAMES_STATIC: Record<number, string> = { 1: 'P1 Punta', 2: 'P2 Llano', 3: 'P3 Valle' }
-
-const CARD = {
-  background: 'var(--card-grad)', border: '1px solid var(--border-c)',
-  borderRadius: 12, padding: '16px 18px', boxShadow: 'var(--shadow-card)',
-}
 
 export default async function CostePage({ searchParams }: { searchParams: { cups?: string } }) {
   const supabase = await createClient()
@@ -191,7 +186,7 @@ export default async function CostePage({ searchParams }: { searchParams: { cups
                 <div style={{ fontSize: 22, fontWeight: 700, color: 'var(--text)', fontFamily: 'var(--font-mono)' }}>
                   {kwh.toFixed(1)}<span style={{ fontSize: 11, color: 'var(--muted-c)', marginLeft: 4, fontFamily: 'var(--font-sans)' }}>kWh</span>
                 </div>
-                <div style={{ fontSize: 14, color: '#34d399', marginTop: 3, fontFamily: 'var(--font-mono)' }}>{cost.toFixed(2)} €</div>
+                <div style={{ fontSize: 14, color: COLOR_SUCCESS, marginTop: 3, fontFamily: 'var(--font-mono)' }}>{cost.toFixed(2)} €</div>
                 <div style={{ fontSize: 10, color: 'var(--dim)', marginTop: 6 }}>
                   {fixedPrice != null
                     ? <span>{t('fixedPrice')} <span style={{ color: 'var(--muted-c)', fontFamily: 'var(--font-mono)' }}>{fixedPrice.toFixed(5)} €/kWh</span></span>
@@ -227,7 +222,7 @@ export default async function CostePage({ searchParams }: { searchParams: { cups
           ))}
           <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', paddingTop: 10, marginTop: 4 }}>
             <span style={{ fontSize: 13, fontWeight: 600, color: 'var(--text)' }}>{t('totalWithVat')}</span>
-            <span style={{ fontSize: 20, fontWeight: 700, color: '#34d399', fontFamily: 'var(--font-mono)' }}>{bill.total.toFixed(2)} €</span>
+            <span style={{ fontSize: 20, fontWeight: 700, color: COLOR_SUCCESS, fontFamily: 'var(--font-mono)' }}>{bill.total.toFixed(2)} €</span>
           </div>
           {!hasPower && (
             <p style={{ fontSize: 10.5, color: 'var(--dim2)', marginTop: 10 }}>
@@ -247,7 +242,7 @@ export default async function CostePage({ searchParams }: { searchParams: { cups
           {[
             { label: t('projectedEnergy'), val: projectedEnergy.toFixed(2), unit: '€', color: '#60a5fa' },
             ...(hasPower ? [{ label: t('projectedPower'), val: powerTerm.toFixed(2), unit: '€', color: '#a78bfa' }] : []),
-            { label: t('projectedWithTax'), val: projectedBill.total.toFixed(2), unit: '€', color: '#34d399' },
+            { label: t('projectedWithTax'), val: projectedBill.total.toFixed(2), unit: '€', color: COLOR_SUCCESS },
           ].map(({ label, val, unit, color }) => (
             <div key={label} style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: '8px 0', borderBottom: '1px solid var(--border-subtle)' }}>
               <span style={{ fontSize: 12, color: 'var(--dim)' }}>{label}</span>
@@ -273,7 +268,7 @@ export default async function CostePage({ searchParams }: { searchParams: { cups
       {tariffConfig.tariffType === 'fixed' && current.marketCost > 0 && (() => {
         const savedVsMarket = current.marketCost - current.totalCost
         const savedSign = savedVsMarket > 0
-        const savedColor = savedSign ? '#34d399' : '#f87171'
+        const savedColor = savedSign ? COLOR_SUCCESS : COLOR_DANGER
         const avgFixed = current.totalKwh > 0 ? current.totalCost / current.totalKwh : 0
         const avgMarket = current.marketCoveredKwh > 0 ? current.marketCost / current.marketCoveredKwh : 0
         const coveragePct = current.totalKwh > 0 ? Math.round(current.marketCoveredKwh / current.totalKwh * 100) : 0
@@ -318,7 +313,7 @@ export default async function CostePage({ searchParams }: { searchParams: { cups
         const peakKw = peak.max_power_kw
         const contracted = tariffConfig.powerKw ?? 0
         const exceeded = contracted > 0 && peakKw > contracted
-        const peakColor = exceeded ? '#f87171' : '#34d399'
+        const peakColor = exceeded ? COLOR_DANGER : COLOR_SUCCESS
         return (
           <div style={{ ...CARD, borderColor: exceeded ? 'rgba(248,113,113,0.3)' : 'var(--border-c)' }}>
             <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: 14 }}>
@@ -326,7 +321,7 @@ export default async function CostePage({ searchParams }: { searchParams: { cups
                 {t('maximeter', { month: format(now, 'MMMM yyyy', { locale: dateFnsLocale }) })}
               </div>
               {exceeded && (
-                <div style={{ fontSize: 10.5, fontWeight: 600, color: '#f87171', background: 'rgba(248,113,113,0.1)', border: '1px solid rgba(248,113,113,0.25)', borderRadius: 6, padding: '3px 9px' }}>
+                <div style={{ fontSize: 10.5, fontWeight: 600, color: COLOR_DANGER, background: 'rgba(248,113,113,0.1)', border: '1px solid rgba(248,113,113,0.25)', borderRadius: 6, padding: '3px 9px' }}>
                   {t('powerExceeded')}
                 </div>
               )}
@@ -348,7 +343,7 @@ export default async function CostePage({ searchParams }: { searchParams: { cups
                   <div style={{ fontSize: 26, fontWeight: 700, color: 'var(--text)', fontFamily: 'var(--font-mono)', letterSpacing: '-0.02em' }}>
                     {contracted.toFixed(3)} <span style={{ fontSize: 13, fontWeight: 400, color: 'var(--muted-c)', fontFamily: 'var(--font-sans)' }}>kW</span>
                   </div>
-                  <div style={{ fontSize: 10.5, color: exceeded ? '#f87171' : '#34d399', marginTop: 4, fontWeight: 500 }}>
+                  <div style={{ fontSize: 10.5, color: exceeded ? COLOR_DANGER : COLOR_SUCCESS, marginTop: 4, fontWeight: 500 }}>
                     {exceeded
                       ? t('excess', { kw: (peakKw - contracted).toFixed(3) })
                       : t('margin', { kw: (contracted - peakKw).toFixed(3) })}
@@ -362,7 +357,7 @@ export default async function CostePage({ searchParams }: { searchParams: { cups
                     <span style={{ color: 'var(--dim)', fontFamily: 'var(--font-mono)' }}>
                       {format(new Date(r.datetime), 'd MMM HH:mm', { locale: dateFnsLocale })}
                     </span>
-                    <span style={{ color: contracted > 0 && r.max_power_kw > contracted ? '#f87171' : 'var(--text-2)', fontFamily: 'var(--font-mono)', fontWeight: 600 }}>
+                    <span style={{ color: contracted > 0 && r.max_power_kw > contracted ? COLOR_DANGER : 'var(--text-2)', fontFamily: 'var(--font-mono)', fontWeight: 600 }}>
                       {r.max_power_kw.toFixed(3)} kW
                     </span>
                   </div>
@@ -401,7 +396,7 @@ export default async function CostePage({ searchParams }: { searchParams: { cups
           <CostLineChart data={current.dailyCumul} />
           {current.dailyCumul.length > 0 && (
             <div style={{ marginTop: 8, fontSize: 11.5, color: 'var(--dim)' }}>
-              {t('energyLabel')} <span style={{ color: '#34d399', fontWeight: 600, fontFamily: 'var(--font-mono)' }}>{current.totalCost.toFixed(2)} €</span>
+              {t('energyLabel')} <span style={{ color: COLOR_SUCCESS, fontWeight: 600, fontFamily: 'var(--font-mono)' }}>{current.totalCost.toFixed(2)} €</span>
               {hasPower && <span style={{ marginLeft: 8 }}>· {t('powerLabel')} <span style={{ color: '#a78bfa', fontWeight: 600, fontFamily: 'var(--font-mono)' }}>{powerTerm.toFixed(2)} €</span></span>}
             </div>
           )}
@@ -422,7 +417,7 @@ export default async function CostePage({ searchParams }: { searchParams: { cups
                 <div key={`p${i}`} style={{ padding: '6px 8px', borderBottom: '1px solid var(--border-subtle)', fontSize: 12, color: '#a78bfa', fontFamily: 'var(--font-mono)' }}>
                   {m.totalKwh > 0 ? (m.totalCost / m.totalKwh).toFixed(4) : '—'}
                 </div>
-                <div key={`c${i}`} style={{ padding: '6px 8px', borderBottom: '1px solid var(--border-subtle)', fontSize: 12, color: '#34d399', fontFamily: 'var(--font-mono)' }}>{m.totalCost.toFixed(2)}</div>
+                <div key={`c${i}`} style={{ padding: '6px 8px', borderBottom: '1px solid var(--border-subtle)', fontSize: 12, color: COLOR_SUCCESS, fontFamily: 'var(--font-mono)' }}>{m.totalCost.toFixed(2)}</div>
               </>
             ))}
           </div>

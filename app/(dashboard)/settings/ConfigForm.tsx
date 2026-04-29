@@ -7,6 +7,7 @@ import { Loader2, CheckCircle2, AlertCircle, ShieldCheck, Eye, EyeOff, RefreshCw
 import type { ProfileRow, UserSupplyRow } from '@/lib/supabase/types-helper'
 import type { DatadisSupply } from '@/lib/types/datadis'
 import { ColorBadge } from '@/components/dashboard/PeriodBadge'
+import { CARD_STYLE as CARD, INPUT_STYLE as INPUT, LABEL_STYLE as LABEL, SECTION_LABEL_STYLE as SECTION_LABEL, BTN_DEFAULT_STYLE as BTN_DEFAULT, BTN_PRIMARY_STYLE as BTN_PRIMARY } from '@/lib/ui-styles'
 
 type LogEntry = { id: number; type: string; msg: string }
 
@@ -24,41 +25,13 @@ interface ConfigFormProps {
   supplies: UserSupplyRow[]
 }
 
-const LABEL: React.CSSProperties = { fontSize: 11, color: 'var(--muted-c)', fontWeight: 500, display: 'block', marginBottom: 5 }
-const INPUT: React.CSSProperties = {
-  width: '100%', padding: '8px 12px', borderRadius: 8,
-  background: 'var(--input-bg)', border: '1px solid var(--input-border)',
-  color: 'var(--text)', fontSize: 13, fontFamily: 'var(--font-sans)', outline: 'none',
-}
-const CARD: React.CSSProperties = {
-  background: 'var(--card-grad)', border: '1px solid var(--border-c)',
-  borderRadius: 12, padding: '16px 18px', boxShadow: 'var(--shadow-card)',
-}
-const BTN_DEFAULT: React.CSSProperties = {
-  display: 'inline-flex', alignItems: 'center', justifyContent: 'center', gap: 6,
-  padding: '7px 14px', borderRadius: 8, cursor: 'pointer',
-  background: 'var(--btn-bg)', color: 'var(--btn-text)', border: '1px solid var(--btn-border)',
-  fontSize: 12, fontWeight: 500, fontFamily: 'var(--font-sans)', transition: 'all 0.15s',
-}
-const BTN_PRIMARY: React.CSSProperties = {
-  display: 'inline-flex', alignItems: 'center', justifyContent: 'center', gap: 6,
-  padding: '7px 14px', borderRadius: 8, cursor: 'pointer',
-  background: 'linear-gradient(135deg, #f59e0b, #f97316)', color: '#0f0f11',
-  border: 'none', fontSize: 12, fontWeight: 600, fontFamily: 'var(--font-sans)',
-  boxShadow: '0 2px 12px rgba(245,158,11,0.3)', transition: 'all 0.15s',
-}
-const SECTION_LABEL: React.CSSProperties = {
-  fontSize: 10.5, fontWeight: 600, color: 'var(--dim)',
-  textTransform: 'uppercase', letterSpacing: '0.1em', marginBottom: 12,
-}
-
 export function ConfigForm({ profile, supplies: initialSupplies }: ConfigFormProps) {
   const t = useTranslations('Settings')
   const tc = useTranslations('Common')
   const supabase = createClient()
 
   const [datadisUsername, setDatadisUsername] = useState(profile?.datadis_username ?? '')
-  const [datadisPassword, setDatadisPassword] = useState('')
+  const passwordRef = useRef<HTMLInputElement>(null)
   const [showPassword, setShowPassword] = useState(false)
   const [authorizedNif, setAuthorizedNif] = useState(profile?.datadis_authorized_nif ?? '')
   const [cups, setCups] = useState(profile?.cups ?? '')
@@ -78,6 +51,9 @@ export function ConfigForm({ profile, supplies: initialSupplies }: ConfigFormPro
   const [pushLoading, setPushLoading] = useState(false)
   const [pushMsg, setPushMsg] = useState<{ ok: boolean; text: string } | null>(null)
 
+  const [deleting, setDeleting] = useState(false)
+  const [deleteMsg, setDeleteMsg] = useState<string | null>(null)
+
   const [saving, setSaving] = useState(false)
   const [testing, setTesting] = useState(false)
   const [syncingDatadis, setSyncingDatadis] = useState(false)
@@ -87,11 +63,37 @@ export function ConfigForm({ profile, supplies: initialSupplies }: ConfigFormPro
   const [syncLogs, setSyncLogs] = useState<LogEntry[]>([])
   const logIdRef = useRef(0)
   const logBoxRef = useRef<HTMLDivElement>(null)
+  const testAbortRef = useRef<AbortController | null>(null)
+  const syncAbortRef = useRef<AbortController | null>(null)
 
   async function handleSave(e: React.FormEvent) {
     e.preventDefault()
-    setSaving(true)
     setSaveMsg(null)
+
+    // Validation
+    if (tariffType === 'fixed') {
+      const p1 = parseFloat(priceP1)
+      const p2 = parseFloat(priceP2)
+      const p3 = parseFloat(priceP3)
+      if (isNaN(p1) || isNaN(p2) || isNaN(p3)) {
+        setSaveMsg({ ok: false, text: t('validationPriceRequired') })
+        return
+      }
+      if (p1 <= 0 || p2 <= 0 || p3 <= 0) {
+        setSaveMsg({ ok: false, text: t('validationPricePositive') })
+        return
+      }
+    }
+    if (cups && !/^ES.{18,20}$/i.test(cups.trim())) {
+      setSaveMsg({ ok: false, text: t('validationCupsFormat') })
+      return
+    }
+    if (distributorCode && !/^\d+$/.test(distributorCode.trim())) {
+      setSaveMsg({ ok: false, text: t('validationDistributorFormat') })
+      return
+    }
+
+    setSaving(true)
 
     const updates: Record<string, unknown> = {
       display_name: displayName || null,
@@ -117,19 +119,20 @@ export function ConfigForm({ profile, supplies: initialSupplies }: ConfigFormPro
       return
     }
 
-    if (datadisPassword) {
+    const newPassword = passwordRef.current?.value ?? ''
+    if (newPassword) {
       const res = await fetch('/api/datadis/credentials', {
         method: 'PATCH',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ password: datadisPassword }),
+        body: JSON.stringify({ password: newPassword }),
       })
+      if (passwordRef.current) passwordRef.current.value = ''
       if (!res.ok) {
         const d = await res.json().catch(() => ({})) as { error?: string }
         setSaveMsg({ ok: false, text: d.error ?? t('errorSavingPassword') })
         setSaving(false)
         return
       }
-      setDatadisPassword('')
     }
 
     setSaveMsg({ ok: true, text: t('saved') })
@@ -137,13 +140,17 @@ export function ConfigForm({ profile, supplies: initialSupplies }: ConfigFormPro
   }
 
   async function handleTestConnection() {
+    testAbortRef.current?.abort()
+    const controller = new AbortController()
+    testAbortRef.current = controller
     setTesting(true)
     setTestResult(null)
     try {
-      const res = await fetch('/api/datadis/supplies')
+      const res = await fetch('/api/datadis/supplies', { signal: controller.signal })
       const data = await res.json()
       setTestResult(res.ok ? { ok: true, supplies: data.supplies ?? [] } : { ok: false, error: data.error ?? t('errorConnection') })
-    } catch {
+    } catch (err) {
+      if (err instanceof Error && err.name === 'AbortError') return
       setTestResult({ ok: false, error: t('errorNetwork') })
     } finally {
       setTesting(false)
@@ -151,10 +158,13 @@ export function ConfigForm({ profile, supplies: initialSupplies }: ConfigFormPro
   }
 
   async function handleSyncDatadis() {
+    syncAbortRef.current?.abort()
+    const controller = new AbortController()
+    syncAbortRef.current = controller
     setSyncingDatadis(true)
     setSyncLogs([])
     try {
-      const res = await fetch('/api/datadis/sync', { method: 'POST' })
+      const res = await fetch('/api/datadis/sync', { method: 'POST', signal: controller.signal })
       if (!res.body) throw new Error('Sin respuesta del servidor')
 
       const reader = res.body.getReader()
@@ -175,7 +185,8 @@ export function ConfigForm({ profile, supplies: initialSupplies }: ConfigFormPro
           } catch { /* ignore malformed */ }
         }
       }
-    } catch {
+    } catch (err) {
+      if (err instanceof Error && err.name === 'AbortError') return
       setSyncLogs(prev => [...prev, { id: ++logIdRef.current, type: 'error', msg: t('errorNetwork') }])
     } finally {
       setSyncingDatadis(false)
@@ -183,10 +194,13 @@ export function ConfigForm({ profile, supplies: initialSupplies }: ConfigFormPro
   }
 
   async function handleSyncPvpc() {
+    syncAbortRef.current?.abort()
+    const controller = new AbortController()
+    syncAbortRef.current = controller
     setSyncingPvpc(true)
     setSyncLogs([])
     try {
-      const res = await fetch('/api/pvpc/sync', { method: 'POST' })
+      const res = await fetch('/api/pvpc/sync', { method: 'POST', signal: controller.signal })
       if (!res.body) throw new Error('Sin respuesta del servidor')
 
       const reader = res.body.getReader()
@@ -207,7 +221,8 @@ export function ConfigForm({ profile, supplies: initialSupplies }: ConfigFormPro
           } catch { /* ignore malformed */ }
         }
       }
-    } catch {
+    } catch (err) {
+      if (err instanceof Error && err.name === 'AbortError') return
       setSyncLogs(prev => [...prev, { id: ++logIdRef.current, type: 'error', msg: t('errorNetwork') }])
     } finally {
       setSyncingPvpc(false)
@@ -285,6 +300,25 @@ export function ConfigForm({ profile, supplies: initialSupplies }: ConfigFormPro
     }
   }
 
+  async function handleDeleteData() {
+    if (!window.confirm(t('deleteDataConfirm'))) return
+    setDeleting(true)
+    setDeleteMsg(null)
+    try {
+      const res = await fetch('/api/user/delete', { method: 'DELETE' })
+      if (!res.ok) {
+        const d = await res.json().catch(() => ({})) as { error?: string }
+        setDeleteMsg(d.error ?? t('errorNetwork'))
+      } else {
+        window.location.href = '/login'
+      }
+    } catch {
+      setDeleteMsg(t('errorNetwork'))
+    } finally {
+      setDeleting(false)
+    }
+  }
+
   useEffect(() => {
     if (logBoxRef.current) {
       logBoxRef.current.scrollTop = logBoxRef.current.scrollHeight
@@ -329,10 +363,9 @@ export function ConfigForm({ profile, supplies: initialSupplies }: ConfigFormPro
                 </label>
                 <div style={{ position: 'relative' }}>
                   <input
+                    ref={passwordRef}
                     style={{ ...INPUT, paddingRight: 36 }}
                     type={showPassword ? 'text' : 'password'}
-                    value={datadisPassword}
-                    onChange={e => setDatadisPassword(e.target.value)}
                     placeholder={profile?.datadis_password_encrypted ? t('passwordSavedPlaceholder') : t('newPasswordPlaceholder')}
                     autoComplete="new-password"
                   />
@@ -644,6 +677,30 @@ export function ConfigForm({ profile, supplies: initialSupplies }: ConfigFormPro
           <p style={{ fontSize: 11, color: 'var(--dim2)', lineHeight: 1.65, margin: 0 }}>
             {t('datadisNote')}
           </p>
+        </div>
+
+        {/* Danger zone */}
+        <div style={{ padding: '12px 14px', borderRadius: 10, border: '1px solid rgba(248,113,113,0.25)', background: 'rgba(248,113,113,0.04)' }}>
+          <div style={{ fontSize: 10.5, fontWeight: 600, color: '#f87171', textTransform: 'uppercase', letterSpacing: '0.1em', marginBottom: 8 }}>
+            {t('dangerZone')}
+          </div>
+          <p style={{ fontSize: 11, color: 'var(--dim2)', lineHeight: 1.6, margin: '0 0 10px 0' }}>
+            {t('deleteDataDesc')}
+          </p>
+          <div style={{ display: 'flex', alignItems: 'center', gap: 10, flexWrap: 'wrap' }}>
+            <button
+              type="button"
+              style={{ padding: '6px 14px', borderRadius: 8, cursor: 'pointer', fontSize: 12, fontWeight: 500, background: 'rgba(248,113,113,0.12)', color: '#f87171', border: '1px solid rgba(248,113,113,0.25)', fontFamily: 'var(--font-sans)', display: 'flex', alignItems: 'center', gap: 6 }}
+              onClick={handleDeleteData}
+              disabled={deleting}
+            >
+              {deleting && <Loader2 size={12} className="spin" />}
+              {deleting ? t('deleting') : t('deleteData')}
+            </button>
+            {deleteMsg && (
+              <span style={{ fontSize: 12, color: '#f87171' }}>{deleteMsg}</span>
+            )}
+          </div>
         </div>
       </div>
     </div>

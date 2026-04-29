@@ -3,9 +3,9 @@
 import { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer } from 'recharts'
 import type { MonthlySummary } from '@/lib/types/consumption'
 
-interface Props { data: MonthlySummary[] }
+interface Props { data: MonthlySummary[]; ariaLabel?: string }
 
-export function MonthlyConsumptionChart({ data }: Props) {
+export function MonthlyConsumptionChart({ data, ariaLabel = 'Gráfico de consumo mensual' }: Props) {
   if (!data.length) return (
     <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', height: 280, color: 'var(--dim)', fontSize: 13 }}>
       Sin datos
@@ -13,6 +13,7 @@ export function MonthlyConsumptionChart({ data }: Props) {
   )
 
   return (
+    <div role="img" aria-label={ariaLabel}>
     <ResponsiveContainer width="100%" height={280}>
       <BarChart data={data} margin={{ top: 4, right: 8, bottom: 4, left: -10 }}>
         <defs>
@@ -32,5 +33,6 @@ export function MonthlyConsumptionChart({ data }: Props) {
         <Bar dataKey="totalKwh" fill="url(#mbar-violet)" radius={[2, 2, 0, 0]} maxBarSize={28} />
       </BarChart>
     </ResponsiveContainer>
+    </div>
   )
 }

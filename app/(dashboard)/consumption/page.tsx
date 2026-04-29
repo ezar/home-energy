@@ -86,16 +86,18 @@ export default async function ConsumoPage({ searchParams }: { searchParams: { cu
     .sort(([a], [b]) => a.localeCompare(b))
     .map(([date, vals]) => ({ date, ...vals }))
 
+  // O(n): accumulate same-weekday history in insertion order (data is date-sorted)
+  const byWeekday = new Map<number, Array<{ date: string; totalKwh: number }>>()
   const weekdayAvgs = new Map<string, number>()
   for (const entry of rawDailyData) {
     const dow = getDay(new Date(entry.date))
-    const sameWeekdayBefore = rawDailyData
-      .filter(d => d.date < entry.date && getDay(new Date(d.date)) === dow)
-      .slice(-8)
-    if (sameWeekdayBefore.length >= 3) {
-      const avg = sameWeekdayBefore.reduce((s, d) => s + d.totalKwh, 0) / sameWeekdayBefore.length
-      weekdayAvgs.set(entry.date, avg)
+    const group = byWeekday.get(dow) ?? []
+    if (group.length >= 3) {
+      const recent = group.slice(-8)
+      weekdayAvgs.set(entry.date, recent.reduce((s, d) => s + d.totalKwh, 0) / recent.length)
     }
+    group.push({ date: entry.date, totalKwh: entry.totalKwh })
+    byWeekday.set(dow, group)
   }
 
   const dailyData: DailySummary[] = rawDailyData.map(({ date, totalKwh, costEur, p1, p2, p3 }) => {

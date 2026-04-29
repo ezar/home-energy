@@ -150,6 +150,10 @@
 }
 @keyframes spin { to { transform: rotate(360deg); } }
 @keyframes pulse { 0%,100% { opacity:1; } 50% { opacity:0.4; } }
+@keyframes shimmer {
+  0%   { transform: translateX(-100%); }
+  100% { transform: translateX(100%); }
+}
 
 .page-enter { animation: fadeUp 0.18s ease both; }
 .spin { animation: spin 1s linear infinite; }

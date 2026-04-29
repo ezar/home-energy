@@ -7,13 +7,8 @@ import {
 } from 'recharts'
 import { PeriodBadge, ColorBadge } from '@/components/dashboard/PeriodBadge'
 import type { ChartDataPoint, TariffPeriod } from '@/lib/types/consumption'
-
-const PERIOD_COLORS: Record<number, string> = { 1: '#f87171', 2: '#fbbf24', 3: '#34d399' }
-
-const CARD = {
-  background: 'var(--card-grad)', border: '1px solid var(--border-c)',
-  borderRadius: 12, padding: '16px 18px', boxShadow: 'var(--shadow-card)',
-}
+import { PERIOD_COLORS, COLOR_SUCCESS, COLOR_DANGER, COLOR_PURPLE, COLOR_CYAN } from '@/lib/constants'
+import { CARD_STYLE as CARD } from '@/lib/ui-styles'
 
 interface Props {
   data: ChartDataPoint[]
@@ -29,7 +24,7 @@ function CustomTooltip({ active, payload, label }: any) {
       <div style={{ color: 'var(--muted-c)', marginBottom: 6 }}>{label}</div>
       <div style={{ color: 'var(--text)', fontFamily: 'var(--font-mono)' }}>{d?.consumptionKwh?.toFixed(3)} kWh</div>
       {d?.priceEurKwh != null && (
-        <div style={{ color: '#a78bfa', fontFamily: 'var(--font-mono)' }}>{d.priceEurKwh.toFixed(5)} €/kWh</div>
+        <div style={{ color: COLOR_PURPLE, fontFamily: 'var(--font-mono)' }}>{d.priceEurKwh.toFixed(5)} €/kWh</div>
       )}
     </div>
   )
@@ -62,14 +57,14 @@ export function PvpcView({ data, avgPricePaid, avgMarketPrice }: Props) {
             {t('title')}
           </div>
           <div style={{ display: 'flex', gap: 10 }}>
-            {[1, 2, 3].map(p => (
+            {([1, 2, 3] as const).map(p => (
               <div key={p} style={{ display: 'flex', alignItems: 'center', gap: 4, fontSize: 10.5, color: 'var(--muted-c)' }}>
                 <div style={{ width: 8, height: 8, borderRadius: 2, background: PERIOD_COLORS[p] }} />
                 {PERIOD_NAMES[p]}
               </div>
             ))}
-            <div style={{ display: 'flex', alignItems: 'center', gap: 4, fontSize: 10.5, color: '#a78bfa' }}>
-              <div style={{ width: 14, height: 2, background: '#a78bfa', borderRadius: 1 }} /> PVPC
+            <div style={{ display: 'flex', alignItems: 'center', gap: 4, fontSize: 10.5, color: COLOR_PURPLE }}>
+              <div style={{ width: 14, height: 2, background: COLOR_PURPLE, borderRadius: 1 }} /> PVPC
             </div>
           </div>
         </div>
@@ -78,7 +73,7 @@ export function PvpcView({ data, avgPricePaid, avgMarketPrice }: Props) {
           <ResponsiveContainer width="100%" height={200}>
             <ComposedChart data={data} margin={{ top: 4, right: 48, bottom: 0, left: -10 }}>
               <defs>
-                {[1, 2, 3].map(p => (
+                {([1, 2, 3] as const).map(p => (
                   <linearGradient key={p} id={`pvpc-bar-${p}`} x1="0" y1="0" x2="0" y2="1">
                     <stop offset="0%" stopColor={PERIOD_COLORS[p]} stopOpacity={0.95} />
                     <stop offset="100%" stopColor={PERIOD_COLORS[p]} stopOpacity={0.45} />
@@ -88,14 +83,14 @@ export function PvpcView({ data, avgPricePaid, avgMarketPrice }: Props) {
               <CartesianGrid strokeDasharray="3 3" stroke="var(--grid-line)" vertical={false} />
               <XAxis dataKey="hour" tick={{ fontSize: 10, fill: 'var(--dim)' }} tickLine={false} axisLine={false} interval={5} />
               <YAxis yAxisId="kwh" tick={{ fontSize: 10, fill: 'var(--dim)' }} tickLine={false} axisLine={false} tickFormatter={(v: number) => v.toFixed(1)} width={32} />
-              <YAxis yAxisId="pvpc" orientation="right" tick={{ fontSize: 10, fill: '#a78bfa' }} tickLine={false} axisLine={false} tickFormatter={(v: number) => v.toFixed(2)} width={44} />
+              <YAxis yAxisId="pvpc" orientation="right" tick={{ fontSize: 10, fill: COLOR_PURPLE }} tickLine={false} axisLine={false} tickFormatter={(v: number) => v.toFixed(2)} width={44} />
               <Tooltip content={<CustomTooltip />} />
               <Bar yAxisId="kwh" dataKey="consumptionKwh" radius={[2, 2, 0, 0]} maxBarSize={16}>
                 {data.map((d, i) => (
                   <Cell key={i} fill={`url(#pvpc-bar-${d.period ?? 3})`} />
                 ))}
               </Bar>
-              <Line yAxisId="pvpc" dataKey="priceEurKwh" stroke="#a78bfa" strokeWidth={1.5} dot={false} activeDot={{ r: 3, fill: '#a78bfa' }} connectNulls />
+              <Line yAxisId="pvpc" dataKey="priceEurKwh" stroke="#a78bfa" strokeWidth={1.5} dot={false} activeDot={{ r: 3, fill: COLOR_PURPLE }} connectNulls />
             </ComposedChart>
           </ResponsiveContainer>
         ) : (
@@ -108,10 +103,10 @@ export function PvpcView({ data, avgPricePaid, avgMarketPrice }: Props) {
       {/* Metrics */}
       <div className="g4">
         {[
-          { label: t('avgMarketPrice'), val: avgMarketPrice != null ? avgMarketPrice.toFixed(5) + ' €/kWh' : '—', color: '#a78bfa' },
-          { label: t('avgPricePaid'), val: avgPricePaid != null ? avgPricePaid.toFixed(5) + ' €/kWh' : '—', color: '#38bdf8' },
-          { label: t('cheapHoursLabel'), val: cheapCount + ' h', color: '#34d399' },
-          { label: t('expHoursLabel'), val: expCount + ' h', color: '#f87171' },
+          { label: t('avgMarketPrice'), val: avgMarketPrice != null ? avgMarketPrice.toFixed(5) + ' €/kWh' : '—', color: COLOR_PURPLE },
+          { label: t('avgPricePaid'), val: avgPricePaid != null ? avgPricePaid.toFixed(5) + ' €/kWh' : '—', color: COLOR_CYAN },
+          { label: t('cheapHoursLabel'), val: cheapCount + ' h', color: COLOR_SUCCESS },
+          { label: t('expHoursLabel'), val: expCount + ' h', color: COLOR_DANGER },
         ].map(item => (
           <div key={item.label} style={CARD}>
             <div style={{ fontSize: 10.5, fontWeight: 500, color: 'var(--dim)', textTransform: 'uppercase', letterSpacing: '0.06em', marginBottom: 8 }}>{item.label}</div>
@@ -123,7 +118,7 @@ export function PvpcView({ data, avgPricePaid, avgMarketPrice }: Props) {
       {/* Cheap / expensive hours */}
       <div className="g2">
         <div style={{ ...CARD, borderColor: 'rgba(52,211,153,0.25)' }}>
-          <div style={{ fontSize: 11, fontWeight: 600, color: '#34d399', marginBottom: 8 }}>{t('bestHoursTitle')}</div>
+          <div style={{ fontSize: 11, fontWeight: 600, color: COLOR_SUCCESS, marginBottom: 8 }}>{t('bestHoursTitle')}</div>
           <div style={{ display: 'flex', gap: 6, flexWrap: 'wrap', marginBottom: 10 }}>
             {cheapUniq.map(h => <ColorBadge key={h} color="#34d399">{h}</ColorBadge>)}
           </div>
@@ -132,7 +127,7 @@ export function PvpcView({ data, avgPricePaid, avgMarketPrice }: Props) {
           </div>
         </div>
         <div style={{ ...CARD, borderColor: 'rgba(248,113,113,0.25)' }}>
-          <div style={{ fontSize: 11, fontWeight: 600, color: '#f87171', marginBottom: 8 }}>{t('avoidHoursTitle')}</div>
+          <div style={{ fontSize: 11, fontWeight: 600, color: COLOR_DANGER, marginBottom: 8 }}>{t('avoidHoursTitle')}</div>
           <div style={{ display: 'flex', gap: 6, flexWrap: 'wrap', marginBottom: 10 }}>
             {expUniq.map(h => <ColorBadge key={h} color="#f87171">{h}</ColorBadge>)}
           </div>

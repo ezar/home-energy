@@ -8,11 +8,13 @@ interface DayData { day: number; kwh: number }
 interface Props {
   data: DayData[]
   avgKwh: number
+  ariaLabel?: string
 }
 
-export function HomeDailyChart({ data, avgKwh }: Props) {
+export function HomeDailyChart({ data, avgKwh, ariaLabel = 'Tendencia de consumo diario' }: Props) {
   const t = useTranslations('Home')
   return (
+    <div role="img" aria-label={ariaLabel}>
     <ResponsiveContainer width="100%" height={120}>
       <BarChart data={data} margin={{ top: 4, right: 4, bottom: 0, left: -20 }}>
         <CartesianGrid strokeDasharray="3 3" stroke="var(--grid-line)" vertical={false} />
@@ -38,5 +40,6 @@ export function HomeDailyChart({ data, avgKwh }: Props) {
         </Bar>
       </BarChart>
     </ResponsiveContainer>
+    </div>
   )
 }
