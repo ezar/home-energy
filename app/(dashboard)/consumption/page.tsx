@@ -26,6 +26,7 @@ export default async function ConsumoPage({ searchParams }: { searchParams: { cu
     .from('consumption').select('datetime, consumption_kwh, period')
     .eq('user_id', user.id).gte('datetime', subDays(today, 90).toISOString())
     .order('datetime', { ascending: true })
+    .limit(5000)  // 90d × 24h = 2160 rows; explicit limit avoids PostgREST 1000-row default
   if (selectedCups) dailyQ = dailyQ.eq('cups', selectedCups)
 
   const monthlyStart = startOfMonth(subMonths(now, 23)).toISOString()
@@ -33,7 +34,8 @@ export default async function ConsumoPage({ searchParams }: { searchParams: { cu
   const [hourlyResult, pvpcResult, dailyRawResult, monthlyRawResult, suppliesResult] = await Promise.all([
     hourlyQ,
     supabase.from('pvpc_prices').select('datetime, price_eur_kwh')
-      .gte('datetime', subDays(today, 90).toISOString()).order('datetime', { ascending: true }),
+      .gte('datetime', subDays(today, 90).toISOString()).order('datetime', { ascending: true })
+      .limit(5000),  // 90d × 24h = 2160 rows
     dailyQ,
     supabase.rpc('get_monthly_consumption', {
       p_user_id: user.id,
@@ -53,14 +55,6 @@ export default async function ConsumoPage({ searchParams }: { searchParams: { cu
   const supplies = (suppliesResult.data ?? []) as Pick<UserSupplyRow, 'cups' | 'display_name'>[]
 
   const pvpcMap = new Map<string, number>(pvpcRows.map((p) => [p.datetime, p.price_eur_kwh]))
-
-  // Debug: log first datetime from each source to detect format mismatch
-  if (process.env.NODE_ENV !== 'production') {
-    console.log('[pvpc-debug] pvpc[0]:', pvpcRows[0]?.datetime)
-    console.log('[pvpc-debug] hourly[0]:', hourlyRows[0]?.datetime)
-    console.log('[pvpc-debug] pvpcMap size:', pvpcMap.size)
-    console.log('[pvpc-debug] hourly hit:', hourlyRows[0] ? pvpcMap.has(hourlyRows[0].datetime) : 'n/a')
-  }
 
   const hourlyData: ChartDataPoint[] = hourlyRows.map((r) => {
     const dt = new Date(r.datetime)
