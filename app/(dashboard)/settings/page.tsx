@@ -1,6 +1,7 @@
 import { createClient } from '@/lib/supabase/server'
 import { ConfigForm } from './ConfigForm'
 import type { ProfileRow, UserSupplyRow } from '@/lib/supabase/types-helper'
+import pkg from '@/package.json'
 
 export const dynamic = 'force-dynamic'
 
@@ -24,6 +25,11 @@ export default async function ConfiguracionPage() {
         <p className="text-sm text-muted-foreground mt-1">Credenciales Datadis, suministros y notificaciones</p>
       </div>
       <ConfigForm profile={profile} supplies={supplies} />
+      <div style={{ textAlign: 'center', paddingBottom: 8 }}>
+        <span style={{ fontSize: 11, color: 'var(--dim2)', fontFamily: 'var(--font-mono)' }}>
+          v{pkg.version}
+        </span>
+      </div>
     </div>
   )
 }

@@ -10,23 +10,7 @@ import { ConsumptionPattern } from '@/components/charts/ConsumptionPattern'
 import { PeriodBadge } from '@/components/dashboard/PeriodBadge'
 import type { ChartDataPoint, DailySummary, MonthlySummary, TariffPeriod } from '@/lib/types/consumption'
 import { PERIOD_COLORS, COLOR_SUCCESS, COLOR_DANGER, COLOR_WARNING, COLOR_INFO } from '@/lib/constants'
-import { CARD_STYLE as CARD } from '@/lib/ui-styles'
-
-const TAB_STYLE = (active: boolean): React.CSSProperties => ({
-  padding: '5px 12px', borderRadius: 8, cursor: 'pointer', fontSize: 12, fontWeight: active ? 500 : 400,
-  background: active ? 'rgba(245,158,11,0.12)' : 'var(--btn-bg)',
-  color: active ? 'var(--nav-active-text)' : 'var(--btn-text)',
-  border: `1px solid ${active ? 'rgba(245,158,11,0.25)' : 'var(--btn-border)'}`,
-  transition: 'all 0.15s', fontFamily: 'var(--font-sans)',
-})
-
-const CHIP_STYLE = (active: boolean): React.CSSProperties => ({
-  padding: '3px 10px', borderRadius: 6, cursor: 'pointer', fontSize: 11, fontWeight: active ? 500 : 400,
-  background: active ? 'rgba(96,165,250,0.12)' : 'transparent',
-  color: active ? COLOR_INFO : 'var(--dim)',
-  border: `1px solid ${active ? 'rgba(96,165,250,0.25)' : 'transparent'}`,
-  transition: 'all 0.15s', fontFamily: 'var(--font-sans)',
-})
+import { CARD_STYLE as CARD, tabStyle as TAB_STYLE, chipStyle as CHIP_STYLE } from '@/lib/ui-styles'
 
 type ViewMode = 'hourly' | 'daily' | 'monthly' | 'pattern' | 'heatmap'
 
