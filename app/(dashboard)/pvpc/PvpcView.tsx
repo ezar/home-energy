@@ -98,7 +98,7 @@ export function PvpcView({ data, avgPricePaid, avgMarketPrice }: Props) {
 
         {filteredData.length > 0 ? (
           <ResponsiveContainer width="100%" height={200}>
-            <ComposedChart data={filteredData} margin={{ top: 4, right: 36, bottom: 0, left: -10 }}>
+            <ComposedChart data={filteredData} margin={{ top: 4, right: 8, bottom: 0, left: -10 }}>
               <defs>
                 {([1, 2, 3] as const).map(p => (
                   <linearGradient key={p} id={`pvpc-bar-${p}`} x1="0" y1="0" x2="0" y2="1">
@@ -110,7 +110,7 @@ export function PvpcView({ data, avgPricePaid, avgMarketPrice }: Props) {
               <CartesianGrid strokeDasharray="3 3" stroke="var(--grid-line)" vertical={false} />
               <XAxis dataKey="hour" tick={{ fontSize: 10, fill: 'var(--dim)' }} tickLine={false} axisLine={false} interval={range === '48h' ? 5 : range === '7d' ? 11 : 47} />
               <YAxis yAxisId="kwh" tick={{ fontSize: 10, fill: 'var(--dim)' }} tickLine={false} axisLine={false} tickFormatter={(v: number) => v.toFixed(1)} width={32} />
-              <YAxis yAxisId="pvpc" orientation="right" tick={{ fontSize: 10, fill: COLOR_PURPLE }} tickLine={false} axisLine={false} tickFormatter={(v: number) => v.toFixed(2)} width={36} />
+              <YAxis yAxisId="pvpc" orientation="right" tick={false} tickLine={false} axisLine={false} width={8} />
               <Tooltip content={<CustomTooltip />} />
               <Bar yAxisId="kwh" dataKey="consumptionKwh" radius={[2, 2, 0, 0]} maxBarSize={16}>
                 {filteredData.map((d, i) => (
