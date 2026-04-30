@@ -74,11 +74,12 @@ export default async function CostePage({ searchParams }: { searchParams: { cups
     months.map(async ({ label, shortLabel, start, end, isCurrentMonth }) => {
       let consumptionQ = supabase.from('consumption').select('consumption_kwh, period, datetime')
         .eq('user_id', user.id).gte('datetime', start).lt('datetime', end)
+        .limit(3000)  // 1 month × 24h × up to N cups
       if (selectedCups) consumptionQ = consumptionQ.eq('cups', selectedCups)
 
       const queries: [Promise<{ data: CRow[] | null }>, Promise<{ data: PRow[] | null }>] = [
         consumptionQ as unknown as Promise<{ data: CRow[] | null }>,
-        supabase.from('pvpc_prices').select('datetime, price_eur_kwh').gte('datetime', start).lt('datetime', end) as unknown as Promise<{ data: PRow[] | null }>,
+        (supabase.from('pvpc_prices').select('datetime, price_eur_kwh').gte('datetime', start).lt('datetime', end).limit(1000)) as unknown as Promise<{ data: PRow[] | null }>,
       ]
       const [{ data: consumptionRaw }, { data: pvpcRaw }] = await Promise.all(queries)
       const consumption = (consumptionRaw ?? []) as CRow[]

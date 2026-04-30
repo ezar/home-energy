@@ -22,11 +22,12 @@ export default async function PvpcPage({ searchParams }: { searchParams: { cups?
     .eq('user_id', user.id)
     .gte('datetime', from)
     .order('datetime', { ascending: true })
+    .limit(3000)  // 30d × 24h × up to N cups
   if (selectedCups) consumptionQ = consumptionQ.eq('cups', selectedCups)
 
   const [consumptionResult, pvpcResult, suppliesResult] = await Promise.all([
     consumptionQ,
-    supabase.from('pvpc_prices').select('datetime, price_eur_kwh').gte('datetime', from).order('datetime', { ascending: true }),
+    supabase.from('pvpc_prices').select('datetime, price_eur_kwh').gte('datetime', from).order('datetime', { ascending: true }).limit(1000),
     supabase.from('user_supplies').select('cups, display_name').eq('user_id', user.id).eq('is_active', true),
   ])
 
