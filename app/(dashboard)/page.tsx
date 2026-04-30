@@ -254,8 +254,8 @@ export default async function HomePage({ searchParams }: { searchParams: { cups?
 
         {/* Último dato */}
         <StatCard
-          label={t('lastData')}
-          value={latestDatetime ? format(new Date(latestDatetime), 'dd MMM HH:mm') : tc('noData')}
+          label={latestDatetime ? `${t('lastData')} · ${format(new Date(latestDatetime), 'dd MMM')}` : t('lastData')}
+          value={latestDatetime ? format(new Date(latestDatetime), 'HH:mm') : tc('noData')}
           icon={<Clock size={14} color={COLOR_CYAN} />}
           iconBg="rgba(56,189,248,0.1)"
           meta={
