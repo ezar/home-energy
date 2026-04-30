@@ -52,17 +52,11 @@ export default async function ConsumoPage({ searchParams }: { searchParams: { cu
   const monthlyAgg = (monthlyRawResult.data ?? []) as { month: string; total_kwh: number }[]
   const supplies = (suppliesResult.data ?? []) as Pick<UserSupplyRow, 'cups' | 'display_name'>[]
 
-  // REData stores real UTC; consumption stores Datadis local time as UTC ("fake UTC").
-  // Normalize PVPC keys to Spanish local hour so lookups match the consumption datetime format.
-  const madridHourKey = (iso: string) =>
-    new Date(iso).toLocaleString('sv-SE', { timeZone: 'Europe/Madrid' }).substring(0, 13).replace(' ', 'T')
-
-  const pvpcMap = new Map<string, number>(pvpcRows.map((p) => [madridHourKey(p.datetime), p.price_eur_kwh]))
+  const pvpcMap = new Map<string, number>(pvpcRows.map((p) => [p.datetime, p.price_eur_kwh]))
 
   const hourlyData: ChartDataPoint[] = hourlyRows.map((r) => {
     const dt = new Date(r.datetime)
-    // consumption datetime is "fake UTC" = Spanish local time; take YYYY-MM-DDTHH as key
-    const priceEurKwh = pvpcMap.get(r.datetime.substring(0, 13)) ?? null
+    const priceEurKwh = pvpcMap.get(r.datetime) ?? null
     return {
       datetime: r.datetime,
       hour: format(dt, 'dd/MM HH:mm'),
@@ -77,7 +71,7 @@ export default async function ConsumoPage({ searchParams }: { searchParams: { cu
   for (const r of dailyRows) {
     const dateKey = format(new Date(r.datetime), 'yyyy-MM-dd')
     const existing = dailyMap.get(dateKey) ?? { totalKwh: 0, costEur: 0, p1: 0, p2: 0, p3: 0 }
-    const price = pvpcMap.get(r.datetime.substring(0, 13)) ?? 0
+    const price = pvpcMap.get(r.datetime) ?? 0
     existing.totalKwh += r.consumption_kwh
     existing.costEur += r.consumption_kwh * price
     if (r.period === 1) existing.p1 += r.consumption_kwh
