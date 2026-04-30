@@ -26,6 +26,7 @@ export default async function ConsumoPage({ searchParams }: { searchParams: { cu
     .from('consumption').select('datetime, consumption_kwh, period')
     .eq('user_id', user.id).gte('datetime', subDays(today, 90).toISOString())
     .order('datetime', { ascending: true })
+    .limit(5000)  // 90d × 24h = 2160 rows; explicit limit avoids PostgREST 1000-row default
   if (selectedCups) dailyQ = dailyQ.eq('cups', selectedCups)
 
   const monthlyStart = startOfMonth(subMonths(now, 23)).toISOString()
@@ -33,7 +34,8 @@ export default async function ConsumoPage({ searchParams }: { searchParams: { cu
   const [hourlyResult, pvpcResult, dailyRawResult, monthlyRawResult, suppliesResult] = await Promise.all([
     hourlyQ,
     supabase.from('pvpc_prices').select('datetime, price_eur_kwh')
-      .gte('datetime', subDays(today, 90).toISOString()).order('datetime', { ascending: true }),
+      .gte('datetime', subDays(today, 90).toISOString()).order('datetime', { ascending: true })
+      .limit(5000),  // 90d × 24h = 2160 rows
     dailyQ,
     supabase.rpc('get_monthly_consumption', {
       p_user_id: user.id,
