@@ -46,10 +46,10 @@ export default async function HomePage({ searchParams }: { searchParams: { cups?
   const startToday = startOfDay(now).toISOString()
   const endTomorrow = startOfDay(addDays(now, 2)).toISOString()
 
-  let qThisMonth = supabase.from('consumption').select('consumption_kwh, datetime').eq('user_id', user.id).gte('datetime', startThisMonth)
+  let qThisMonth = supabase.from('consumption').select('consumption_kwh, datetime').eq('user_id', user.id).gte('datetime', startThisMonth).limit(3000)
   if (selectedCups) qThisMonth = qThisMonth.eq('cups', selectedCups)
 
-  let qLastMonth = supabase.from('consumption').select('consumption_kwh').eq('user_id', user.id).gte('datetime', startLastMonth).lt('datetime', endLastMonth)
+  let qLastMonth = supabase.from('consumption').select('consumption_kwh').eq('user_id', user.id).gte('datetime', startLastMonth).lt('datetime', endLastMonth).limit(3000)
   if (selectedCups) qLastMonth = qLastMonth.eq('cups', selectedCups)
 
   let qLatest = supabase.from('consumption').select('datetime').eq('user_id', user.id).order('datetime', { ascending: false }).limit(1)
