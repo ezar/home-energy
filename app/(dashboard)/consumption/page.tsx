@@ -59,6 +59,14 @@ export default async function ConsumoPage({ searchParams }: { searchParams: { cu
 
   const pvpcMap = new Map<string, number>(pvpcRows.map((p) => [madridHourKey(p.datetime), p.price_eur_kwh]))
 
+  // Debug: log first datetime from each source to detect format mismatch
+  if (process.env.NODE_ENV !== 'production') {
+    console.log('[pvpc-debug] pvpc[0]:', pvpcRows[0]?.datetime)
+    console.log('[pvpc-debug] hourly[0]:', hourlyRows[0]?.datetime)
+    console.log('[pvpc-debug] pvpcMap size:', pvpcMap.size)
+    console.log('[pvpc-debug] hourly hit:', hourlyRows[0] ? pvpcMap.has(hourlyRows[0].datetime) : 'n/a')
+  }
+
   const hourlyData: ChartDataPoint[] = hourlyRows.map((r) => {
     const dt = new Date(r.datetime)
     // consumption datetime is "fake UTC" = Spanish local time; take YYYY-MM-DDTHH as key
