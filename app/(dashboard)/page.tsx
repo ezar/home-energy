@@ -41,7 +41,9 @@ export default async function HomePage({ searchParams }: { searchParams: { cups?
   const now = new Date()
   const startThisMonth = startOfMonth(now).toISOString()
   const startLastMonth = startOfMonth(subMonths(now, 1)).toISOString()
-  const endLastMonth = startThisMonth
+  // Compare current-month-to-date with the same number of elapsed days last month
+  // so a partial month is never unfairly compared against a full month.
+  const endLastMonthSamePeriod = startOfDay(addDays(subMonths(now, 1), 1)).toISOString()
   const start24h = subHours(now, 24).toISOString()
   const startToday = startOfDay(now).toISOString()
   const endTomorrow = startOfDay(addDays(now, 2)).toISOString()
@@ -49,7 +51,7 @@ export default async function HomePage({ searchParams }: { searchParams: { cups?
   let qThisMonth = supabase.from('consumption').select('consumption_kwh, datetime').eq('user_id', user.id).gte('datetime', startThisMonth).limit(3000)
   if (selectedCups) qThisMonth = qThisMonth.eq('cups', selectedCups)
 
-  let qLastMonth = supabase.from('consumption').select('consumption_kwh').eq('user_id', user.id).gte('datetime', startLastMonth).lt('datetime', endLastMonth).limit(3000)
+  let qLastMonth = supabase.from('consumption').select('consumption_kwh').eq('user_id', user.id).gte('datetime', startLastMonth).lt('datetime', endLastMonthSamePeriod).limit(3000)
   if (selectedCups) qLastMonth = qLastMonth.eq('cups', selectedCups)
 
   let qLatest = supabase.from('consumption').select('datetime').eq('user_id', user.id).order('datetime', { ascending: false }).limit(1)

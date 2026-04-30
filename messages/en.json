@@ -384,7 +384,18 @@
     "month09": "Sep",
     "month10": "Oct",
     "month11": "Nov",
-    "month12": "Dec"
+    "month12": "Dec",
+    "dailyDetail": "Daily detail",
+    "monthlyDetail": "Monthly detail",
+    "patternDetail": "Hourly detail",
+    "colDate": "Date",
+    "colMonth": "Month",
+    "colYoy": "YoY change",
+    "colAnomaly": "Anomaly",
+    "colP1": "P1 kWh",
+    "colP2": "P2 kWh",
+    "colP3": "P3 kWh",
+    "colAvgKwh": "Avg kWh"
   },
   "Pvpc": {
     "title": "Consumption + PVPC · Last 30 days",

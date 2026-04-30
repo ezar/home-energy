@@ -5,6 +5,8 @@ import { format, startOfMonth, subMonths, getDay, subDays, startOfDay } from 'da
 import type { ChartDataPoint, DailySummary, MonthlySummary, TariffPeriod } from '@/lib/types/consumption'
 import type { ConsumptionRow, PvpcPriceRow, UserSupplyRow } from '@/lib/supabase/types-helper'
 
+type DailyRpcRow = { day: string; total_kwh: number; kwh_p1: number; kwh_p2: number; kwh_p3: number; cost_eur: number }
+
 export const dynamic = 'force-dynamic'
 
 export default async function ConsumoPage({ searchParams }: { searchParams: { cups?: string } }) {
@@ -20,23 +22,22 @@ export default async function ConsumoPage({ searchParams }: { searchParams: { cu
     .from('consumption').select('datetime, consumption_kwh, period')
     .eq('user_id', user.id).gte('datetime', subDays(today, 30).toISOString())
     .order('datetime', { ascending: true })
+    .limit(1000)  // 30d × 24h = 720 rows per CUPS
   if (selectedCups) hourlyQ = hourlyQ.eq('cups', selectedCups)
 
-  let dailyQ = supabase
-    .from('consumption').select('datetime, consumption_kwh, period')
-    .eq('user_id', user.id).gte('datetime', subDays(today, 90).toISOString())
-    .order('datetime', { ascending: true })
-    .limit(5000)  // 90d × 24h = 2160 rows; explicit limit avoids PostgREST 1000-row default
-  if (selectedCups) dailyQ = dailyQ.eq('cups', selectedCups)
-
   const monthlyStart = startOfMonth(subMonths(now, 23)).toISOString()
+  const dailyStart = subDays(today, 90).toISOString()
 
-  const [hourlyResult, pvpcResult, dailyRawResult, monthlyRawResult, suppliesResult] = await Promise.all([
+  const [hourlyResult, pvpcResult, dailyRpcResult, monthlyRawResult, suppliesResult] = await Promise.all([
     hourlyQ,
     supabase.from('pvpc_prices').select('datetime, price_eur_kwh')
-      .gte('datetime', subDays(today, 90).toISOString()).order('datetime', { ascending: true })
-      .limit(5000),  // 90d × 24h = 2160 rows
-    dailyQ,
+      .gte('datetime', subDays(today, 30).toISOString()).order('datetime', { ascending: true })
+      .limit(1000),  // 30d × 24h = 720 rows; enough for hourly overlay
+    supabase.rpc('get_daily_consumption', {
+      p_user_id: user.id,
+      p_cups: selectedCups,
+      p_start: dailyStart,
+    }),
     supabase.rpc('get_monthly_consumption', {
       p_user_id: user.id,
       p_cups: selectedCups,
@@ -50,7 +51,7 @@ export default async function ConsumoPage({ searchParams }: { searchParams: { cu
 
   const hourlyRows = (hourlyResult.data ?? []) as HourlyRow[]
   const pvpcRows = (pvpcResult.data ?? []) as PvpcRow[]
-  const dailyRows = (dailyRawResult.data ?? []) as HourlyRow[]
+  const dailyRpcRows = (dailyRpcResult.data ?? []) as DailyRpcRow[]
   const monthlyAgg = (monthlyRawResult.data ?? []) as { month: string; total_kwh: number }[]
   const supplies = (suppliesResult.data ?? []) as Pick<UserSupplyRow, 'cups' | 'display_name'>[]
 
@@ -60,14 +61,6 @@ export default async function ConsumoPage({ searchParams }: { searchParams: { cu
     new Date(iso).toLocaleString('sv-SE', { timeZone: 'Europe/Madrid' }).substring(0, 13).replace(' ', 'T')
 
   const pvpcMap = new Map<string, number>(pvpcRows.map((p) => [madridHourKey(p.datetime), p.price_eur_kwh]))
-
-  // Debug: log first datetime from each source to detect format mismatch
-  if (process.env.NODE_ENV !== 'production') {
-    console.log('[pvpc-debug] pvpc[0]:', pvpcRows[0]?.datetime)
-    console.log('[pvpc-debug] hourly[0]:', hourlyRows[0]?.datetime)
-    console.log('[pvpc-debug] pvpcMap size:', pvpcMap.size)
-    console.log('[pvpc-debug] hourly hit:', hourlyRows[0] ? pvpcMap.has(hourlyRows[0].datetime) : 'n/a')
-  }
 
   const hourlyData: ChartDataPoint[] = hourlyRows.map((r) => {
     const dt = new Date(r.datetime)
@@ -83,22 +76,14 @@ export default async function ConsumoPage({ searchParams }: { searchParams: { cu
     }
   })
 
-  const dailyMap = new Map<string, { totalKwh: number; costEur: number; p1: number; p2: number; p3: number }>()
-  for (const r of dailyRows) {
-    const dateKey = format(new Date(r.datetime), 'yyyy-MM-dd')
-    const existing = dailyMap.get(dateKey) ?? { totalKwh: 0, costEur: 0, p1: 0, p2: 0, p3: 0 }
-    const price = pvpcMap.get(r.datetime.substring(0, 13)) ?? 0
-    existing.totalKwh += r.consumption_kwh
-    existing.costEur += r.consumption_kwh * price
-    if (r.period === 1) existing.p1 += r.consumption_kwh
-    else if (r.period === 2) existing.p2 += r.consumption_kwh
-    else existing.p3 += r.consumption_kwh
-    dailyMap.set(dateKey, existing)
-  }
-
-  const rawDailyData = Array.from(dailyMap.entries())
-    .sort(([a], [b]) => a.localeCompare(b))
-    .map(([date, vals]) => ({ date, ...vals }))
+  const rawDailyData = dailyRpcRows.map(r => ({
+    date: r.day,
+    totalKwh: Number(r.total_kwh),
+    costEur: Number(r.cost_eur),
+    p1: Number(r.kwh_p1),
+    p2: Number(r.kwh_p2),
+    p3: Number(r.kwh_p3),
+  }))
 
   // O(n): accumulate same-weekday history in insertion order (data is date-sorted)
   const byWeekday = new Map<number, Array<{ date: string; totalKwh: number }>>()

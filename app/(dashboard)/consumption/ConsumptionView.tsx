@@ -382,6 +382,86 @@ export function ConsumptionView({ hourlyData, dailyData, monthlyData }: Props) {
           </div>
         </div>
       )}
+
+      {/* Daily detail table */}
+      {view === 'daily' && filteredDaily.length > 0 && (
+        <div style={CARD}>
+          <div style={{ fontSize: 10.5, fontWeight: 600, color: 'var(--dim)', textTransform: 'uppercase', letterSpacing: '0.1em', marginBottom: 12 }}>
+            {t('dailyDetail')}
+          </div>
+          <div className="table-scroll">
+            <div style={{ display: 'grid', gridTemplateColumns: '80px 1fr 1fr 1fr 1fr 1fr 70px', minWidth: 480 }}>
+              {[t('colDate'), t('colKwh'), t('colP1'), t('colP2'), t('colP3'), t('colCost'), t('colAnomaly')].map(h => (
+                <div key={h} style={{ fontSize: 10, fontWeight: 600, color: 'var(--dim)', textTransform: 'uppercase', letterSpacing: '0.06em', padding: '4px 8px', borderBottom: '1px solid var(--border-c)' }}>{h}</div>
+              ))}
+              {[...filteredDaily].reverse().map((d, i) => (
+                <>
+                  <div key={`dt${i}`} style={{ padding: '5px 8px', borderBottom: '1px solid var(--border-subtle)', fontSize: 11, color: 'var(--muted-c)', fontFamily: 'var(--font-mono)' }}>{d.date}</div>
+                  <div key={`dk${i}`} style={{ padding: '5px 8px', borderBottom: '1px solid var(--border-subtle)', fontSize: 11, color: 'var(--text-2)', fontFamily: 'var(--font-mono)' }}>{d.totalKwh.toFixed(2)}</div>
+                  <div key={`p1${i}`} style={{ padding: '5px 8px', borderBottom: '1px solid var(--border-subtle)', fontSize: 11, color: PERIOD_COLORS[1], fontFamily: 'var(--font-mono)' }}>{d.kwhP1.toFixed(2)}</div>
+                  <div key={`p2${i}`} style={{ padding: '5px 8px', borderBottom: '1px solid var(--border-subtle)', fontSize: 11, color: PERIOD_COLORS[2], fontFamily: 'var(--font-mono)' }}>{d.kwhP2.toFixed(2)}</div>
+                  <div key={`p3${i}`} style={{ padding: '5px 8px', borderBottom: '1px solid var(--border-subtle)', fontSize: 11, color: PERIOD_COLORS[3], fontFamily: 'var(--font-mono)' }}>{d.kwhP3.toFixed(2)}</div>
+                  <div key={`dc${i}`} style={{ padding: '5px 8px', borderBottom: '1px solid var(--border-subtle)', fontSize: 11, color: COLOR_SUCCESS, fontFamily: 'var(--font-mono)' }}>{d.estimatedCostEur > 0 ? `${d.estimatedCostEur.toFixed(3)} €` : '—'}</div>
+                  <div key={`da${i}`} style={{ padding: '5px 8px', borderBottom: '1px solid var(--border-subtle)', fontSize: 11, color: d.isAnomalous ? COLOR_DANGER : 'var(--dim)' }}>
+                    {d.isAnomalous ? '⚠' : '—'}
+                  </div>
+                </>
+              ))}
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Monthly detail table */}
+      {view === 'monthly' && recent12.length > 0 && (
+        <div style={CARD}>
+          <div style={{ fontSize: 10.5, fontWeight: 600, color: 'var(--dim)', textTransform: 'uppercase', letterSpacing: '0.1em', marginBottom: 12 }}>
+            {t('monthlyDetail')}
+          </div>
+          <div className="table-scroll">
+            <div style={{ display: 'grid', gridTemplateColumns: '90px 1fr 1fr', minWidth: 280 }}>
+              {[t('colMonth'), t('colKwh'), t('colYoy')].map(h => (
+                <div key={h} style={{ fontSize: 10, fontWeight: 600, color: 'var(--dim)', textTransform: 'uppercase', letterSpacing: '0.06em', padding: '4px 8px', borderBottom: '1px solid var(--border-c)' }}>{h}</div>
+              ))}
+              {[...yoyComparison].reverse().map((m, i) => {
+                const yoyUp = (m.yoyPct ?? 0) > 0
+                const yoyColor = m.yoyPct === null ? 'var(--dim)' : yoyUp ? COLOR_DANGER : COLOR_SUCCESS
+                return (
+                  <>
+                    <div key={`mm${i}`} style={{ padding: '5px 8px', borderBottom: '1px solid var(--border-subtle)', fontSize: 11, color: 'var(--muted-c)', fontFamily: 'var(--font-mono)' }}>{m.month}</div>
+                    <div key={`mk${i}`} style={{ padding: '5px 8px', borderBottom: '1px solid var(--border-subtle)', fontSize: 11, color: 'var(--text-2)', fontFamily: 'var(--font-mono)' }}>{m.totalKwh.toFixed(1)}</div>
+                    <div key={`my${i}`} style={{ padding: '5px 8px', borderBottom: '1px solid var(--border-subtle)', fontSize: 11, color: yoyColor, fontFamily: 'var(--font-mono)' }}>
+                      {m.yoyPct !== null ? `${yoyUp ? '+' : ''}${m.yoyPct.toFixed(1)}%` : '—'}
+                    </div>
+                  </>
+                )
+              })}
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Pattern detail table */}
+      {view === 'pattern' && hourPattern.length > 0 && (
+        <div style={CARD}>
+          <div style={{ fontSize: 10.5, fontWeight: 600, color: 'var(--dim)', textTransform: 'uppercase', letterSpacing: '0.1em', marginBottom: 12 }}>
+            {t('patternDetail')}
+          </div>
+          <div className="table-scroll">
+            <div style={{ display: 'grid', gridTemplateColumns: '60px 1fr', minWidth: 200 }}>
+              {[t('colHour'), t('colAvgKwh')].map(h => (
+                <div key={h} style={{ fontSize: 10, fontWeight: 600, color: 'var(--dim)', textTransform: 'uppercase', letterSpacing: '0.06em', padding: '4px 8px', borderBottom: '1px solid var(--border-c)' }}>{h}</div>
+              ))}
+              {hourPattern.map((h, i) => (
+                <>
+                  <div key={`ph${i}`} style={{ padding: '5px 8px', borderBottom: '1px solid var(--border-subtle)', fontSize: 11, color: 'var(--muted-c)', fontFamily: 'var(--font-mono)' }}>{h.hour}</div>
+                  <div key={`pa${i}`} style={{ padding: '5px 8px', borderBottom: '1px solid var(--border-subtle)', fontSize: 11, color: 'var(--text-2)', fontFamily: 'var(--font-mono)' }}>{h.avgKwh.toFixed(3)}</div>
+                </>
+              ))}
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   )
 }
