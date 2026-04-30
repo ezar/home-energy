@@ -1,10 +1,9 @@
 import { createClient } from '@/lib/supabase/server'
 import { ConsumptionView } from './ConsumptionView'
 import { CupsSelector } from '@/components/dashboard/CupsSelector'
-import { format, startOfMonth, subMonths, getDay } from 'date-fns'
+import { format, startOfMonth, subMonths, getDay, subDays, startOfDay } from 'date-fns'
 import type { ChartDataPoint, DailySummary, MonthlySummary, TariffPeriod } from '@/lib/types/consumption'
 import type { ConsumptionRow, PvpcPriceRow, UserSupplyRow } from '@/lib/supabase/types-helper'
-import { subDays, startOfDay } from 'date-fns'
 
 export const dynamic = 'force-dynamic'
 
@@ -29,29 +28,28 @@ export default async function ConsumoPage({ searchParams }: { searchParams: { cu
     .order('datetime', { ascending: true })
   if (selectedCups) dailyQ = dailyQ.eq('cups', selectedCups)
 
-  let monthlyQ = supabase
-    .from('consumption').select('datetime, consumption_kwh')
-    .eq('user_id', user.id).gte('datetime', startOfMonth(subMonths(now, 23)).toISOString())
-    .order('datetime', { ascending: true })
-  if (selectedCups) monthlyQ = monthlyQ.eq('cups', selectedCups)
+  const monthlyStart = startOfMonth(subMonths(now, 23)).toISOString()
 
   const [hourlyResult, pvpcResult, dailyRawResult, monthlyRawResult, suppliesResult] = await Promise.all([
     hourlyQ,
     supabase.from('pvpc_prices').select('datetime, price_eur_kwh')
       .gte('datetime', subDays(today, 90).toISOString()).order('datetime', { ascending: true }),
     dailyQ,
-    monthlyQ,
+    supabase.rpc('get_monthly_consumption', {
+      p_user_id: user.id,
+      p_cups: selectedCups,
+      p_start: monthlyStart,
+    }),
     supabase.from('user_supplies').select('cups, display_name').eq('user_id', user.id).eq('is_active', true),
   ])
 
   type HourlyRow = Pick<ConsumptionRow, 'datetime' | 'consumption_kwh' | 'period'>
   type PvpcRow = Pick<PvpcPriceRow, 'datetime' | 'price_eur_kwh'>
-  type MonthlyRow = Pick<ConsumptionRow, 'datetime' | 'consumption_kwh'>
 
   const hourlyRows = (hourlyResult.data ?? []) as HourlyRow[]
   const pvpcRows = (pvpcResult.data ?? []) as PvpcRow[]
   const dailyRows = (dailyRawResult.data ?? []) as HourlyRow[]
-  const monthlyRows = (monthlyRawResult.data ?? []) as MonthlyRow[]
+  const monthlyAgg = (monthlyRawResult.data ?? []) as { month: string; total_kwh: number }[]
   const supplies = (suppliesResult.data ?? []) as Pick<UserSupplyRow, 'cups' | 'display_name'>[]
 
   const pvpcMap = new Map<string, number>(pvpcRows.map((p) => [p.datetime, p.price_eur_kwh]))
@@ -114,15 +112,12 @@ export default async function ConsumoPage({ searchParams }: { searchParams: { cu
     }
   })
 
-  const monthlyMap = new Map<string, number>()
-  for (const r of monthlyRows) {
-    const monthKey = format(new Date(r.datetime), 'yyyy-MM')
-    monthlyMap.set(monthKey, (monthlyMap.get(monthKey) ?? 0) + r.consumption_kwh)
-  }
-
-  const monthlyData: MonthlySummary[] = Array.from(monthlyMap.entries())
-    .sort(([a], [b]) => a.localeCompare(b))
-    .map(([month, totalKwh]) => ({ month, totalKwh, estimatedCostEur: 0, avgPriceEurKwh: 0 }))
+  const monthlyData: MonthlySummary[] = monthlyAgg.map(r => ({
+    month: r.month,
+    totalKwh: Number(r.total_kwh),
+    estimatedCostEur: 0,
+    avgPriceEurKwh: 0,
+  }))
 
   return (
     <div className="p-6 space-y-6">

@@ -5,6 +5,7 @@ import { NextIntlClientProvider } from 'next-intl'
 import { getLocale, getMessages } from 'next-intl/server'
 import { ThemeProvider } from '@/components/providers/ThemeProvider'
 import { SwRegister } from '@/components/providers/SwRegister'
+import { SplashScreen } from '@/components/providers/SplashScreen'
 import './globals.css'
 
 const spaceGrotesk = Space_Grotesk({
@@ -47,6 +48,7 @@ export default async function RootLayout({ children }: { children: React.ReactNo
       <body className={`${spaceGrotesk.variable} ${jetbrainsMono.variable}`}>
         <NextIntlClientProvider messages={messages}>
           <ThemeProvider>
+            <SplashScreen />
             {children}
           </ThemeProvider>
         </NextIntlClientProvider>
