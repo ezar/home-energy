@@ -8,7 +8,7 @@ import { ThemeToggle } from '@/components/dashboard/ThemeToggle'
 import { SignOutButton } from '@/components/dashboard/SignOutButton'
 import { LanguageToggle } from '@/components/dashboard/LanguageToggle'
 
-const DATA_PAGES = new Set(['/', '/consumption', '/cost', '/pvpc'])
+const DATA_PAGES = new Set(['/', '/consumption', '/cost', '/pvpc', '/offers'])
 const STALE_THRESHOLD_DAYS = 3
 
 interface TopbarProps {
@@ -28,6 +28,7 @@ export function Topbar({ latestDataAt }: TopbarProps) {
     '/consumption':  { title: t('consumptionTitle'), sub: t('consumptionSub') },
     '/cost':         { title: t('costTitle'),        sub: t('costSub') },
     '/pvpc':         { title: t('pvpcTitle'),        sub: t('pvpcSub') },
+    '/offers':       { title: t('offersTitle'),      sub: t('offersSub') },
     '/settings':     { title: t('settingsTitle'),    sub: t('settingsSub') },
     '/welcome':      { title: t('welcomeTitle'),     sub: t('welcomeSub') },
     '/help':         { title: t('helpTitle'),        sub: t('helpSub') },

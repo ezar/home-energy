@@ -3,7 +3,7 @@
 import Link from 'next/link'
 import { usePathname } from 'next/navigation'
 import { useTranslations } from 'next-intl'
-import { Zap, BarChart3, DollarSign, TrendingUp, Settings, HelpCircle } from 'lucide-react'
+import { Zap, BarChart3, DollarSign, TrendingUp, Scale, Settings, HelpCircle } from 'lucide-react'
 
 interface SidebarProps {
   lastSyncAt: string | null
@@ -20,6 +20,7 @@ export function Sidebar({ lastSyncAt, syncing }: SidebarProps) {
     { href: '/consumption',  label: t('consumption'),     icon: BarChart3 },
     { href: '/cost',         label: t('cost'),            icon: DollarSign },
     { href: '/pvpc',         label: t('pvpc'),            icon: TrendingUp },
+    { href: '/offers',       label: t('offers'),          icon: Scale },
     { href: '/settings',     label: t('settings'),        icon: Settings },
     { href: '/help',         label: t('help'),            icon: HelpCircle },
   ]
