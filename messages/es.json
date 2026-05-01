@@ -277,6 +277,9 @@
     "deleting": "Eliminando..."
   },
   "Cost": {
+    "last30days": "Últimos 30 días",
+    "prev30days": "30–60 días atrás",
+    "prev60days": "60–90 días atrás",
     "energyNoTax": "Energía (sin impuestos)",
     "kwhConsumed": "kWh consumidos",
     "avgEnergyPrice": "Precio medio energía",

@@ -3,7 +3,7 @@ import { getTranslations, getLocale } from 'next-intl/server'
 import { CostLineChart } from '@/components/charts/CostLineChart'
 import { TariffSimulator } from './TariffSimulator'
 import { CupsSelector } from '@/components/dashboard/CupsSelector'
-import { startOfMonth, subMonths, format, getDate, getDaysInMonth } from 'date-fns'
+import { startOfMonth, subMonths, startOfDay, subDays, format, getDate, getDaysInMonth } from 'date-fns'
 import { es, enUS } from 'date-fns/locale'
 import type { ConsumptionRow, PvpcPriceRow, ProfileRow, MaximeterRow, UserSupplyRow } from '@/lib/supabase/types-helper'
 import {
@@ -34,7 +34,7 @@ export default async function CostePage({ searchParams }: { searchParams: { cups
   const [profileResult, maximeterResult, suppliesResult] = await Promise.all([
     supabase
       .from('profiles')
-      .select('tariff_type, price_p1_eur_kwh, price_p2_eur_kwh, price_p3_eur_kwh, power_kw, power_price_eur_kw_month')
+      .select('tariff_type, price_p1_eur_kwh, price_p2_eur_kwh, price_p3_eur_kwh, power_kw, power_price_eur_kw_month, month_view_mode')
       .eq('id', user.id)
       .single(),
     (() => {
@@ -51,21 +51,27 @@ export default async function CostePage({ searchParams }: { searchParams: { cups
   const maximeterRows = (maximeterResult.data ?? []) as MaxRow[]
   const supplies = (suppliesResult.data ?? []) as Pick<UserSupplyRow, 'cups' | 'display_name'>[]
 
-  const tariffConfig = tariffConfigFromProfile(
-    (profileResult.data ?? {}) as Pick<ProfileRow,
-      'tariff_type' | 'price_p1_eur_kwh' | 'price_p2_eur_kwh' | 'price_p3_eur_kwh' | 'power_kw' | 'power_price_eur_kw_month'>
-  )
+  const profileData = (profileResult.data ?? {}) as Pick<ProfileRow,
+    'tariff_type' | 'price_p1_eur_kwh' | 'price_p2_eur_kwh' | 'price_p3_eur_kwh' | 'power_kw' | 'power_price_eur_kw_month' | 'month_view_mode'>
+  const tariffConfig = tariffConfigFromProfile(profileData)
+  const isRolling = profileData.month_view_mode === 'rolling_30d'
 
-  const months = [0, 1, 2].map(offset => {
-    const d = subMonths(now, offset)
-    return {
-      label: format(d, 'MMMM yyyy', { locale: dateFnsLocale }),
-      shortLabel: format(d, 'MMM', { locale: dateFnsLocale }),
-      start: startOfMonth(d).toISOString(),
-      end: offset === 0 ? now.toISOString() : startOfMonth(subMonths(d, -1)).toISOString(),
-      isCurrentMonth: offset === 0,
-    }
-  })
+  const months = isRolling
+    ? [
+        { label: t('last30days'), shortLabel: '30d', start: startOfDay(subDays(now, 30)).toISOString(), end: now.toISOString(), isCurrentMonth: true },
+        { label: t('prev30days'), shortLabel: '-30d', start: startOfDay(subDays(now, 60)).toISOString(), end: startOfDay(subDays(now, 30)).toISOString(), isCurrentMonth: false },
+        { label: t('prev60days'), shortLabel: '-60d', start: startOfDay(subDays(now, 90)).toISOString(), end: startOfDay(subDays(now, 60)).toISOString(), isCurrentMonth: false },
+      ]
+    : [0, 1, 2].map(offset => {
+        const d = subMonths(now, offset)
+        return {
+          label: format(d, 'MMMM yyyy', { locale: dateFnsLocale }),
+          shortLabel: format(d, 'MMM', { locale: dateFnsLocale }),
+          start: startOfMonth(d).toISOString(),
+          end: offset === 0 ? now.toISOString() : startOfMonth(subMonths(d, -1)).toISOString(),
+          isCurrentMonth: offset === 0,
+        }
+      })
 
   type CRow = Pick<ConsumptionRow, 'consumption_kwh' | 'period' | 'datetime'>
   type PRow = Pick<PvpcPriceRow, 'datetime' | 'price_eur_kwh'>

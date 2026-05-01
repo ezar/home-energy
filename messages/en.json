@@ -277,6 +277,9 @@
     "deleting": "Deleting..."
   },
   "Cost": {
+    "last30days": "Last 30 days",
+    "prev30days": "30–60 days ago",
+    "prev60days": "60–90 days ago",
     "energyNoTax": "Energy (excl. taxes)",
     "kwhConsumed": "kWh consumed",
     "avgEnergyPrice": "Average energy price",
