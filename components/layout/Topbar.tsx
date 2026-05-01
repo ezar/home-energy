@@ -1,7 +1,7 @@
 'use client'
 
 import { useState } from 'react'
-import { usePathname } from 'next/navigation'
+import { usePathname, useRouter } from 'next/navigation'
 import { useTranslations } from 'next-intl'
 import { RefreshCw } from 'lucide-react'
 import { ThemeToggle } from '@/components/dashboard/ThemeToggle'
@@ -13,6 +13,7 @@ const DATA_PAGES = new Set(['/', '/consumption', '/cost', '/pvpc'])
 export function Topbar() {
   const [syncing, setSyncing] = useState(false)
   const pathname = usePathname()
+  const router = useRouter()
   const t = useTranslations('Topbar')
 
   const pageTitles: Record<string, { title: string; sub: string }> = {
@@ -34,6 +35,7 @@ export function Topbar() {
       await fetch('/api/datadis/sync', { method: 'POST' })
     } finally {
       setSyncing(false)
+      router.refresh()
     }
   }
 
