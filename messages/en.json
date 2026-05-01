@@ -151,7 +151,9 @@
   },
   "Home": {
     "consumptionMonth": "Monthly consumption",
+    "consumption30d": "30-day consumption",
     "estimatedCost": "Estimated cost",
+    "estimatedCost30d": "30-day cost",
     "avgPrice": "Average price",
     "energyOnly": "Energy term only",
     "priceNow": "Price now",

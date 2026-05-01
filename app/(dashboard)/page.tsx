@@ -124,6 +124,11 @@ export default async function HomePage({ searchParams }: { searchParams: { cups?
   const monthTrend = lastMonthKwh > 0 ? ((thisMonthKwh - lastMonthKwh) / lastMonthKwh) * 100 : null
   const latestDatetime = latestRows[0]?.datetime ?? null
 
+  // Human-readable label for the active period (used in card labels and meta)
+  const periodRangeLabel = isRolling
+    ? `${format(new Date(startThisPeriod), 'd MMM')} – ${format(now, 'd MMM')}`
+    : format(now, 'MMMM yyyy')
+
   // Period breakdown (P1/P2/P3)
   const periodTotals: Record<1 | 2 | 3, number> = { 1: 0, 2: 0, 3: 0 }
   const dailyMap: Record<number, number> = {}
@@ -199,29 +204,32 @@ export default async function HomePage({ searchParams }: { searchParams: { cups?
       <div className="g4">
         {/* Consumo */}
         <StatCard
-          label={t('consumptionMonth')}
+          label={isRolling ? t('consumption30d') : t('consumptionMonth')}
           value={thisMonthKwh.toFixed(1)}
           unit="kWh"
           icon={<Zap size={14} color="#f59e0b" />}
           iconBg="rgba(245,158,11,0.15)"
           accentBg="linear-gradient(135deg,rgba(245,158,11,0.12),rgba(249,115,22,0.06))"
           meta={
-            <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
-              {monthTrend !== null && (
-                <ColorBadge color={monthTrend > 0 ? COLOR_DANGER : COLOR_SUCCESS}>
-                  {monthTrend > 0 ? '↑' : '↓'} {Math.abs(monthTrend).toFixed(1)}%
-                </ColorBadge>
-              )}
-              {lastMonthKwh > 0 && (
-                <span style={{ fontSize: 11, color: 'var(--dim)' }}>vs {lastMonthKwh.toFixed(1)} kWh</span>
-              )}
+            <div style={{ display: 'flex', flexDirection: 'column', gap: 4 }}>
+              <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
+                {monthTrend !== null && (
+                  <ColorBadge color={monthTrend > 0 ? COLOR_DANGER : COLOR_SUCCESS}>
+                    {monthTrend > 0 ? '↑' : '↓'} {Math.abs(monthTrend).toFixed(1)}%
+                  </ColorBadge>
+                )}
+                {lastMonthKwh > 0 && (
+                  <span style={{ fontSize: 11, color: 'var(--dim)' }}>vs {lastMonthKwh.toFixed(1)} kWh</span>
+                )}
+              </div>
+              <span style={{ fontSize: 10, color: 'var(--dim2)' }}>{periodRangeLabel}</span>
             </div>
           }
         />
 
         {/* Coste */}
         <StatCard
-          label={t('estimatedCost')}
+          label={isRolling ? t('estimatedCost30d') : t('estimatedCost')}
           value={estimatedCostEur !== null ? estimatedCostEur.toFixed(2) : '—'}
           unit="€"
           icon={<DollarSign size={14} color="#34d399" />}
@@ -233,6 +241,7 @@ export default async function HomePage({ searchParams }: { searchParams: { cups?
                 {avgPvpc !== null ? avgPvpc.toFixed(5) : '—'} €/kWh
               </span>
               <div style={{ fontSize: 10.5, color: 'var(--dim2)', fontStyle: 'italic', marginTop: 2 }}>{t('energyOnly')}</div>
+              <div style={{ fontSize: 10, color: 'var(--dim2)', marginTop: 1 }}>{periodRangeLabel}</div>
             </div>
           }
         />
