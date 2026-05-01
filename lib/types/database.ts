@@ -25,6 +25,7 @@ export interface Database {
           monthly_kwh_target: number | null
           push_subscription: Record<string, unknown> | null
           push_price_threshold: number | null
+          month_view_mode: 'calendar' | 'rolling_30d'
         }
         Insert: {
           id: string
@@ -47,6 +48,7 @@ export interface Database {
           monthly_kwh_target?: number | null
           push_subscription?: Record<string, unknown> | null
           push_price_threshold?: number | null
+          month_view_mode?: 'calendar' | 'rolling_30d'
         }
         Update: {
           id?: string
@@ -69,6 +71,7 @@ export interface Database {
           monthly_kwh_target?: number | null
           push_subscription?: Record<string, unknown> | null
           push_price_threshold?: number | null
+          month_view_mode?: 'calendar' | 'rolling_30d'
         }
         Relationships: []
       }

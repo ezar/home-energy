@@ -2,7 +2,7 @@ import { createClient } from '@/lib/supabase/server'
 import { redirect } from 'next/navigation'
 import { getTranslations } from 'next-intl/server'
 import { Zap, DollarSign, TrendingUp, Clock } from 'lucide-react'
-import { startOfMonth, subMonths, format, subHours, startOfDay, addDays } from 'date-fns'
+import { startOfMonth, subMonths, format, subHours, startOfDay, addDays, subDays } from 'date-fns'
 import type { ConsumptionRow, PvpcPriceRow, ProfileRow, UserSupplyRow } from '@/lib/supabase/types-helper'
 import { CupsSelector } from '@/components/dashboard/CupsSelector'
 import { StatCard } from '@/components/dashboard/StatCard'
@@ -39,38 +39,49 @@ export default async function HomePage({ searchParams }: { searchParams: { cups?
 
   const selectedCups = searchParams.cups ?? null
   const now = new Date()
-  const startThisMonth = startOfMonth(now).toISOString()
-  const startLastMonth = startOfMonth(subMonths(now, 1)).toISOString()
-  // Compare current-month-to-date with the same number of elapsed days last month
-  // so a partial month is never unfairly compared against a full month.
-  const endLastMonthSamePeriod = startOfDay(addDays(subMonths(now, 1), 1)).toISOString()
+
+  const profileResult = await supabase.from('profiles')
+    .select('last_sync_at, cups, distributor_code, tariff_type, price_p1_eur_kwh, price_p2_eur_kwh, price_p3_eur_kwh, power_kw, power_price_eur_kw_month, monthly_kwh_target, month_view_mode')
+    .eq('id', user.id).single()
+  const profile = profileResult.data as Pick<ProfileRow, 'last_sync_at' | 'cups' | 'distributor_code' | 'tariff_type' | 'price_p1_eur_kwh' | 'price_p2_eur_kwh' | 'price_p3_eur_kwh' | 'power_kw' | 'power_price_eur_kw_month' | 'monthly_kwh_target' | 'month_view_mode'> | null
+
+  const isRolling = profile?.month_view_mode === 'rolling_30d'
+  // "current period" start: either calendar month or rolling 30 days
+  const startThisPeriod = isRolling
+    ? startOfDay(subDays(now, 30)).toISOString()
+    : startOfMonth(now).toISOString()
+  // "previous period" for comparison: same-length window shifted back
+  const startLastPeriod = isRolling
+    ? startOfDay(subDays(now, 60)).toISOString()
+    : startOfMonth(subMonths(now, 1)).toISOString()
+  const endLastPeriod = isRolling
+    ? startThisPeriod
+    : startOfDay(addDays(subMonths(now, 1), 1)).toISOString()
+
   const start24h = subHours(now, 24).toISOString()
   const startToday = startOfDay(now).toISOString()
   const endTomorrow = startOfDay(addDays(now, 2)).toISOString()
 
-  let qThisMonth = supabase.from('consumption').select('consumption_kwh, period, datetime').eq('user_id', user.id).gte('datetime', startThisMonth).limit(3000)
+  let qThisMonth = supabase.from('consumption').select('consumption_kwh, period, datetime').eq('user_id', user.id).gte('datetime', startThisPeriod).limit(3000)
   if (selectedCups) qThisMonth = qThisMonth.eq('cups', selectedCups)
 
-  let qLastMonth = supabase.from('consumption').select('consumption_kwh').eq('user_id', user.id).gte('datetime', startLastMonth).lt('datetime', endLastMonthSamePeriod).limit(3000)
+  let qLastMonth = supabase.from('consumption').select('consumption_kwh').eq('user_id', user.id).gte('datetime', startLastPeriod).lt('datetime', endLastPeriod).limit(3000)
   if (selectedCups) qLastMonth = qLastMonth.eq('cups', selectedCups)
 
   let qLatest = supabase.from('consumption').select('datetime').eq('user_id', user.id).order('datetime', { ascending: false }).limit(1)
   if (selectedCups) qLatest = qLatest.eq('cups', selectedCups)
 
-  const [profileResult, thisMonthResult, lastMonthResult, latestResult, pvpcNowResult, pvpc24hResult, pvpcTodayResult, pvpcMonthResult, suppliesResult] =
+  const [thisMonthResult, lastMonthResult, latestResult, pvpcNowResult, pvpc24hResult, pvpcTodayResult, pvpcMonthResult, suppliesResult] =
     await Promise.all([
-      supabase.from('profiles').select('last_sync_at, cups, distributor_code, tariff_type, price_p1_eur_kwh, price_p2_eur_kwh, price_p3_eur_kwh, power_kw, power_price_eur_kw_month, monthly_kwh_target').eq('id', user.id).single(),
       qThisMonth,
       qLastMonth,
       qLatest,
       supabase.from('pvpc_prices').select('price_eur_kwh, datetime').order('datetime', { ascending: false }).limit(1),
       supabase.from('pvpc_prices').select('price_eur_kwh, datetime').gte('datetime', start24h).order('datetime', { ascending: true }),
       supabase.from('pvpc_prices').select('price_eur_kwh, datetime').gte('datetime', startToday).lt('datetime', endTomorrow).order('datetime', { ascending: true }),
-      supabase.from('pvpc_prices').select('price_eur_kwh, datetime').gte('datetime', startThisMonth).order('datetime', { ascending: true }).limit(1000),
+      supabase.from('pvpc_prices').select('price_eur_kwh, datetime').gte('datetime', startThisPeriod).order('datetime', { ascending: true }).limit(1000),
       supabase.from('user_supplies').select('cups, display_name').eq('user_id', user.id).eq('is_active', true),
     ])
-
-  const profile = profileResult.data as Pick<ProfileRow, 'last_sync_at' | 'cups' | 'distributor_code' | 'tariff_type' | 'price_p1_eur_kwh' | 'price_p2_eur_kwh' | 'price_p3_eur_kwh' | 'power_kw' | 'power_price_eur_kw_month' | 'monthly_kwh_target'> | null
   const thisMonthRows = (thisMonthResult.data ?? []) as MonthRow[]
   const lastMonthRows = (lastMonthResult.data ?? []) as MonthRow[]
   const latestRows = (latestResult.data ?? []) as LatestRow[]
