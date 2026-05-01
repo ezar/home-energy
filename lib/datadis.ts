@@ -13,8 +13,6 @@ import type {
 const BASE_URL = 'https://datadis.es/api-private/api'
 const AUTH_URL = 'https://datadis.es/nikola-auth/tokens/login'
 
-const delay = (ms: number) => new Promise((resolve) => setTimeout(resolve, ms))
-
 export async function getToken(username: string, password: string): Promise<string> {
   const body = new URLSearchParams({ username, password })
 
@@ -48,9 +46,10 @@ async function datadisGet<T>(token: string, path: string, params: Record<string,
   if (res.status === 401) throw new Error('Datadis token expirado o inválido')
 
   if (res.status === 429) {
-    // No reintentamos: el límite de Datadis es diario (no por segundo).
-    // Reintentar solo consume más cuota del mismo día.
-    throw new Error('DATADIS_429')
+    // El límite es por combinación CUPS+mes/24h. No reintentamos.
+    // Leer el body para mostrar el mensaje real ("Consulta ya realizada en las últimas 24 horas").
+    const body = await res.text().catch(() => '')
+    throw new Error(`DATADIS_429:${body.trim()}`)
   }
 
   if (!res.ok) throw new Error(`Datadis error ${res.status} en ${path}`)
@@ -82,7 +81,8 @@ export async function getConsumption(
   token: string,
   params: GetConsumptionParams
 ): Promise<DatadisConsumptionResponse> {
-  await delay(2000) // Respetar rate limit (~1 req/s según documentación)
+  // Sin delay: el límite real de Datadis es por combinación CUPS+mes/24h,
+  // no por segundo. El delay solo causaba timeouts en cargas históricas largas.
 
   const queryParams: Record<string, string> = {
     cups: params.cups,
@@ -109,7 +109,6 @@ export async function getMaxPower(
   token: string,
   params: GetMaxPowerParams
 ): Promise<DatadisMaxPowerResponse> {
-  await delay(2000)
 
   const queryParams: Record<string, string> = {
     cups: params.cups,
@@ -128,7 +127,6 @@ export async function getContractDetail(
   distributorCode: string,
   authorizedNif?: string
 ): Promise<DatadisContractResponse> {
-  await delay(1500)
 
   const params: Record<string, string> = { cups, distributorCode }
   if (authorizedNif) params.authorizedNif = authorizedNif

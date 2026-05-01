@@ -157,7 +157,6 @@ export async function POST(request: Request) {
       send('info', `Suministro: ${supply.display_name ?? supply.cups}`)
 
       // Consumo horario — guardado mes a mes para no perder progreso si hay timeout
-      let datadisRateLimited = false
       for (const monthStart of months) {
         const monthLabel = format(monthStart, 'MMM yyyy', { locale: es })
         send('info', `Consultando consumo ${monthLabel}...`)
@@ -174,10 +173,12 @@ export async function POST(request: Request) {
             authorizedNif: datadis_authorized_nif ?? undefined,
           })
         } catch (err) {
-          if (err instanceof Error && err.message === 'DATADIS_429') {
-            send('warn', `Datadis: límite diario de peticiones alcanzado en ${monthLabel}. Los meses anteriores están guardados. Espera ~24h para continuar.`)
-            datadisRateLimited = true
-            break
+          if (err instanceof Error && err.message.startsWith('DATADIS_429')) {
+            // Este mes ya fue consultado hoy — cada mes es un bucket independiente,
+            // así que continuamos con los demás en lugar de abortar todo.
+            const detail = err.message.slice('DATADIS_429:'.length)
+            send('warn', `${monthLabel}: ya sincronizado hoy (${detail || 'cuota 24h'}) — saltando`)
+            continue
           }
           send('warn', `${monthLabel}: error — ${err instanceof Error ? err.message : 'error desconocido'}`)
           continue
@@ -211,8 +212,6 @@ export async function POST(request: Request) {
           send('ok', `${monthLabel}: ${monthRows.length} registros guardados`)
         }
       }
-
-      if (datadisRateLimited) break
 
       // Maxímetro (potencia máxima mensual)
       try {
