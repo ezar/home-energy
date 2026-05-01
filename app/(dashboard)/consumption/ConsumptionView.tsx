@@ -5,6 +5,7 @@ import { useTranslations } from 'next-intl'
 import { HourlyConsumptionChart } from '@/components/charts/HourlyConsumptionChart'
 import { DailyConsumptionChart } from '@/components/charts/DailyConsumptionChart'
 import { MonthlyConsumptionChart } from '@/components/charts/MonthlyConsumptionChart'
+import { YoYComparisonChart } from '@/components/charts/YoYComparisonChart'
 import { ConsumptionHeatmap } from '@/components/charts/ConsumptionHeatmap'
 import { ConsumptionPattern } from '@/components/charts/ConsumptionPattern'
 import { PeriodBadge } from '@/components/dashboard/PeriodBadge'
@@ -340,29 +341,43 @@ export function ConsumptionView({ hourlyData, dailyData, monthlyData }: Props) {
               { label: t('statPeakMonth'), val: monthlyPeak?.month ?? '—', unit: `${Math.round(monthlyPeak?.totalKwh ?? 0)} kWh`, color: COLOR_DANGER },
             ])}
 
-            {yoyComparison.some(m => m.yoyPct !== null) && (
-              <div style={{ marginTop: 14, borderTop: '1px solid var(--border-subtle)', paddingTop: 12 }}>
-                <div style={{ fontSize: 10, fontWeight: 600, color: 'var(--dim)', textTransform: 'uppercase', letterSpacing: '0.08em', marginBottom: 8 }}>
-                  {t('yoyTitle')}
-                </div>
-                <div style={{ display: 'flex', flexWrap: 'wrap', gap: 6 }}>
-                  {yoyComparison.filter(m => m.yoyPct !== null).map(m => {
-                    const up = (m.yoyPct ?? 0) > 0
-                    const color = up ? COLOR_DANGER : COLOR_SUCCESS
-                    const [, mon] = m.month.split('-')
-                    const monthKey = `month${mon}` as Parameters<typeof t>[0]
-                    return (
-                      <div key={m.month} style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 2, padding: '5px 8px', borderRadius: 6, background: 'var(--bg-inset)', minWidth: 44 }}>
-                        <span style={{ fontSize: 9.5, color: 'var(--dim)' }}>{t(monthKey)}</span>
-                        <span style={{ fontSize: 11, fontWeight: 600, color, fontFamily: 'var(--font-mono)' }}>
-                          {up ? '+' : ''}{(m.yoyPct ?? 0).toFixed(0)}%
+            {yoyComparison.some(m => m.yoyPct !== null) && (() => {
+              const withPrev = yoyComparison.filter(m => m.prevKwh !== null)
+              const sumCurr = withPrev.reduce((s, m) => s + m.totalKwh, 0)
+              const sumPrev = withPrev.reduce((s, m) => s + (m.prevKwh ?? 0), 0)
+              const overallPct = sumPrev > 0 ? ((sumCurr - sumPrev) / sumPrev) * 100 : null
+              const chartData = yoyComparison.map(m => {
+                const [, mon] = m.month.split('-')
+                const monthKey = `month${mon}` as Parameters<typeof t>[0]
+                return { label: t(monthKey), ...m }
+              })
+              return (
+                <div style={{ marginTop: 14, borderTop: '1px solid var(--border-subtle)', paddingTop: 12 }}>
+                  <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 10 }}>
+                    <div style={{ fontSize: 10, fontWeight: 600, color: 'var(--dim)', textTransform: 'uppercase', letterSpacing: '0.08em' }}>
+                      {t('yoyTitle')}
+                    </div>
+                    {overallPct !== null && (
+                      <span style={{
+                        fontSize: 12, fontWeight: 700, fontFamily: 'var(--font-mono)',
+                        color: overallPct > 5 ? COLOR_DANGER : overallPct < -5 ? COLOR_SUCCESS : 'var(--dim)',
+                      }}>
+                        {overallPct > 0 ? '+' : ''}{overallPct.toFixed(1)}%
+                        {' '}
+                        <span style={{ fontSize: 10, fontWeight: 400, fontFamily: 'var(--font-sans)', color: 'var(--dim2)' }}>
+                          {t('yoySummaryLabel')}
                         </span>
-                      </div>
-                    )
-                  })}
+                      </span>
+                    )}
+                  </div>
+                  <YoYComparisonChart
+                    data={chartData}
+                    labelThisYear={t('yoyThisYear')}
+                    labelLastYear={t('yoyLastYear')}
+                  />
                 </div>
-              </div>
-            )}
+              )
+            })()}
           </>
         )}
 
