@@ -35,3 +35,23 @@ export const BTN_PRIMARY_STYLE: React.CSSProperties = {
   border: 'none', fontSize: 12, fontWeight: 600, fontFamily: 'var(--font-sans)',
   boxShadow: '0 2px 12px rgba(245,158,11,0.3)', transition: 'all 0.15s',
 }
+
+// Navigation tab toggle (e.g. Horaria / Diaria / Mensual)
+export const tabStyle = (active: boolean): React.CSSProperties => ({
+  padding: '6px 12px', borderRadius: 8, cursor: 'pointer',
+  fontSize: 12, fontWeight: active ? 500 : 400,
+  background: active ? 'rgba(245,158,11,0.12)' : 'var(--btn-bg)',
+  color: active ? '#f59e0b' : 'var(--btn-text)',
+  border: `1px solid ${active ? 'rgba(245,158,11,0.25)' : 'var(--btn-border)'}`,
+  transition: 'all 0.15s', fontFamily: 'var(--font-sans)',
+})
+
+// Compact range chip (e.g. 7d / 14d / 30d)
+export const chipStyle = (active: boolean): React.CSSProperties => ({
+  padding: '4px 10px', borderRadius: 6, cursor: 'pointer',
+  fontSize: 11, fontWeight: active ? 500 : 400,
+  background: active ? 'rgba(96,165,250,0.12)' : 'transparent',
+  color: active ? '#60a5fa' : 'var(--dim)',
+  border: `1px solid ${active ? 'rgba(96,165,250,0.25)' : 'transparent'}`,
+  transition: 'all 0.15s', fontFamily: 'var(--font-sans)',
+})

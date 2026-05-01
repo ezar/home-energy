@@ -2,7 +2,7 @@ import { createClient } from '@/lib/supabase/server'
 import { redirect } from 'next/navigation'
 import { getTranslations } from 'next-intl/server'
 import { Zap, DollarSign, TrendingUp, Clock } from 'lucide-react'
-import { startOfMonth, subMonths, format, subHours, startOfDay, addDays } from 'date-fns'
+import { startOfMonth, subMonths, format, subHours, startOfDay, addDays, subDays } from 'date-fns'
 import type { ConsumptionRow, PvpcPriceRow, ProfileRow, UserSupplyRow } from '@/lib/supabase/types-helper'
 import { CupsSelector } from '@/components/dashboard/CupsSelector'
 import { StatCard } from '@/components/dashboard/StatCard'
@@ -10,13 +10,15 @@ import { ColorBadge } from '@/components/dashboard/PeriodBadge'
 import { PvpcBarChart } from '@/components/charts/PvpcBarChart'
 import { PvpcSparkline } from '@/components/charts/PvpcSparkline'
 import { HomeDailyChart } from '@/components/charts/HomeDailyChart'
-import { tariffConfigFromProfile, getEnergyPrice } from '@/lib/pricing'
+import { HomeMonthlyChart } from '@/components/charts/HomeMonthlyChart'
+import { tariffConfigFromProfile, getEnergyPrice, applyTaxes, monthlyPowerCost } from '@/lib/pricing'
 import { getPeriod } from '@/lib/tariff'
 import { PERIOD_COLORS, COLOR_SUCCESS, COLOR_DANGER, COLOR_WARNING, COLOR_INFO, COLOR_PURPLE, COLOR_CYAN } from '@/lib/constants'
 
 export const dynamic = 'force-dynamic'
 
-type MonthRow = Pick<ConsumptionRow, 'consumption_kwh' | 'datetime'>
+type MonthRow = Pick<ConsumptionRow, 'consumption_kwh' | 'period' | 'datetime'>
+type MonthlyRpcRow = { month: string; total_kwh: number }
 type LatestRow = Pick<ConsumptionRow, 'datetime'>
 type PvpcRow = Pick<PvpcPriceRow, 'price_eur_kwh' | 'datetime'>
 type Appliance = { name: string; duration: number; icon: string; color: string }
@@ -39,44 +41,61 @@ export default async function HomePage({ searchParams }: { searchParams: { cups?
 
   const selectedCups = searchParams.cups ?? null
   const now = new Date()
-  const startThisMonth = startOfMonth(now).toISOString()
-  const startLastMonth = startOfMonth(subMonths(now, 1)).toISOString()
-  // Compare current-month-to-date with the same number of elapsed days last month
-  // so a partial month is never unfairly compared against a full month.
-  const endLastMonthSamePeriod = startOfDay(addDays(subMonths(now, 1), 1)).toISOString()
+
+  const profileResult = await supabase.from('profiles')
+    .select('last_sync_at, cups, distributor_code, tariff_type, price_p1_eur_kwh, price_p2_eur_kwh, price_p3_eur_kwh, power_kw, power_price_eur_kw_month, monthly_kwh_target, month_view_mode')
+    .eq('id', user.id).single()
+  const profile = profileResult.data as Pick<ProfileRow, 'last_sync_at' | 'cups' | 'distributor_code' | 'tariff_type' | 'price_p1_eur_kwh' | 'price_p2_eur_kwh' | 'price_p3_eur_kwh' | 'power_kw' | 'power_price_eur_kw_month' | 'monthly_kwh_target' | 'month_view_mode'> | null
+
+  const isRolling = profile?.month_view_mode === 'rolling_30d'
+  // "current period" start: either calendar month or rolling 30 days
+  const startThisPeriod = isRolling
+    ? startOfDay(subDays(now, 30)).toISOString()
+    : startOfMonth(now).toISOString()
+  // "previous period" for comparison: same-length window shifted back
+  const startLastPeriod = isRolling
+    ? startOfDay(subDays(now, 60)).toISOString()
+    : startOfMonth(subMonths(now, 1)).toISOString()
+  const endLastPeriod = isRolling
+    ? startThisPeriod
+    : startOfDay(addDays(subMonths(now, 1), 1)).toISOString()
+
   const start24h = subHours(now, 24).toISOString()
   const startToday = startOfDay(now).toISOString()
   const endTomorrow = startOfDay(addDays(now, 2)).toISOString()
 
-  let qThisMonth = supabase.from('consumption').select('consumption_kwh, datetime').eq('user_id', user.id).gte('datetime', startThisMonth).limit(3000)
+  let qThisMonth = supabase.from('consumption').select('consumption_kwh, period, datetime').eq('user_id', user.id).gte('datetime', startThisPeriod).limit(3000)
   if (selectedCups) qThisMonth = qThisMonth.eq('cups', selectedCups)
 
-  let qLastMonth = supabase.from('consumption').select('consumption_kwh').eq('user_id', user.id).gte('datetime', startLastMonth).lt('datetime', endLastMonthSamePeriod).limit(3000)
+  let qLastMonth = supabase.from('consumption').select('consumption_kwh').eq('user_id', user.id).gte('datetime', startLastPeriod).lt('datetime', endLastPeriod).limit(3000)
   if (selectedCups) qLastMonth = qLastMonth.eq('cups', selectedCups)
 
   let qLatest = supabase.from('consumption').select('datetime').eq('user_id', user.id).order('datetime', { ascending: false }).limit(1)
   if (selectedCups) qLatest = qLatest.eq('cups', selectedCups)
 
-  const [profileResult, thisMonthResult, lastMonthResult, latestResult, pvpcNowResult, pvpc24hResult, pvpcTodayResult, suppliesResult] =
+  const annual12mStart = startOfMonth(subMonths(now, 11)).toISOString()
+
+  const [thisMonthResult, lastMonthResult, latestResult, pvpcNowResult, pvpc24hResult, pvpcTodayResult, pvpcMonthResult, suppliesResult, annual12mResult] =
     await Promise.all([
-      supabase.from('profiles').select('last_sync_at, cups, distributor_code, tariff_type, price_p1_eur_kwh, price_p2_eur_kwh, price_p3_eur_kwh, power_kw, power_price_eur_kw_month, monthly_kwh_target').eq('id', user.id).single(),
       qThisMonth,
       qLastMonth,
       qLatest,
       supabase.from('pvpc_prices').select('price_eur_kwh, datetime').order('datetime', { ascending: false }).limit(1),
       supabase.from('pvpc_prices').select('price_eur_kwh, datetime').gte('datetime', start24h).order('datetime', { ascending: true }),
       supabase.from('pvpc_prices').select('price_eur_kwh, datetime').gte('datetime', startToday).lt('datetime', endTomorrow).order('datetime', { ascending: true }),
+      supabase.from('pvpc_prices').select('price_eur_kwh, datetime').gte('datetime', startThisPeriod).order('datetime', { ascending: true }).limit(1000),
       supabase.from('user_supplies').select('cups, display_name').eq('user_id', user.id).eq('is_active', true),
+      supabase.rpc('get_monthly_consumption', { p_user_id: user.id, p_cups: selectedCups ?? null, p_start: annual12mStart }),
     ])
-
-  const profile = profileResult.data as Pick<ProfileRow, 'last_sync_at' | 'cups' | 'distributor_code' | 'tariff_type' | 'price_p1_eur_kwh' | 'price_p2_eur_kwh' | 'price_p3_eur_kwh' | 'power_kw' | 'power_price_eur_kw_month' | 'monthly_kwh_target'> | null
   const thisMonthRows = (thisMonthResult.data ?? []) as MonthRow[]
   const lastMonthRows = (lastMonthResult.data ?? []) as MonthRow[]
   const latestRows = (latestResult.data ?? []) as LatestRow[]
   const pvpcNow = ((pvpcNowResult.data ?? []) as PvpcRow[])[0] ?? null
   const pvpc24h = (pvpc24hResult.data ?? []) as PvpcRow[]
   const pvpcToday = (pvpcTodayResult.data ?? []) as PvpcRow[]
+  const pvpcMonth = (pvpcMonthResult.data ?? []) as PvpcRow[]
   const supplies = (suppliesResult.data ?? []) as Pick<UserSupplyRow, 'cups' | 'display_name'>[]
+  const annual12mData = ((annual12mResult.data ?? []) as MonthlyRpcRow[]).map(r => ({ month: r.month, totalKwh: Number(r.total_kwh) }))
 
   const t = await getTranslations('Home')
   const tp = await getTranslations('Period')
@@ -89,10 +108,36 @@ export default async function HomePage({ searchParams }: { searchParams: { cups?
 
   const thisMonthKwh = thisMonthRows.reduce((s, r) => s + r.consumption_kwh, 0)
   const lastMonthKwh = lastMonthRows.reduce((s, r) => s + r.consumption_kwh, 0)
-  const estimatedCostEur = pvpcNow ? thisMonthKwh * pvpcNow.price_eur_kwh : null
-  const avgPvpc = pvpcNow ? pvpcNow.price_eur_kwh : null
+
+  // Weighted cost: each hour × its own PVPC price (same logic as the Cost page)
+  const pvpcMonthMap = new Map(pvpcMonth.map(p => [p.datetime, p.price_eur_kwh]))
+  let estimatedCostEur: number | null = null
+  let costCoveredKwh = 0
+  if (pvpcMonth.length > 0 || tariffConfig.tariffType === 'fixed') {
+    let total = 0
+    for (const r of thisMonthRows) {
+      const pvpcPrice = pvpcMonthMap.get(r.datetime) ?? null
+      const period = (r.period ?? 3) as 1 | 2 | 3
+      const price = getEnergyPrice(period, pvpcPrice, tariffConfig)
+      total += r.consumption_kwh * price
+      if (pvpcPrice !== null || tariffConfig.tariffType === 'fixed') costCoveredKwh += r.consumption_kwh
+    }
+    estimatedCostEur = total
+  }
+  const avgPvpc = costCoveredKwh > 0 && estimatedCostEur !== null
+    ? estimatedCostEur / costCoveredKwh
+    : (pvpcNow?.price_eur_kwh ?? null)
+
+  const powerTerm = monthlyPowerCost(tariffConfig)
+  const bill = estimatedCostEur !== null ? applyTaxes(estimatedCostEur, powerTerm) : null
+
   const monthTrend = lastMonthKwh > 0 ? ((thisMonthKwh - lastMonthKwh) / lastMonthKwh) * 100 : null
   const latestDatetime = latestRows[0]?.datetime ?? null
+
+  // Human-readable label for the active period (used in card labels and meta)
+  const periodRangeLabel = isRolling
+    ? `${format(new Date(startThisPeriod), 'd MMM')} – ${format(now, 'd MMM')}`
+    : format(now, 'MMMM yyyy')
 
   // Period breakdown (P1/P2/P3)
   const periodTotals: Record<1 | 2 | 3, number> = { 1: 0, 2: 0, 3: 0 }
@@ -169,40 +214,54 @@ export default async function HomePage({ searchParams }: { searchParams: { cups?
       <div className="g4">
         {/* Consumo */}
         <StatCard
-          label={t('consumptionMonth')}
+          label={isRolling ? t('consumption30d') : t('consumptionMonth')}
           value={thisMonthKwh.toFixed(1)}
           unit="kWh"
           icon={<Zap size={14} color="#f59e0b" />}
           iconBg="rgba(245,158,11,0.15)"
           accentBg="linear-gradient(135deg,rgba(245,158,11,0.12),rgba(249,115,22,0.06))"
           meta={
-            <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
-              {monthTrend !== null && (
-                <ColorBadge color={monthTrend > 0 ? COLOR_DANGER : COLOR_SUCCESS}>
-                  {monthTrend > 0 ? '↑' : '↓'} {Math.abs(monthTrend).toFixed(1)}%
-                </ColorBadge>
-              )}
-              {lastMonthKwh > 0 && (
-                <span style={{ fontSize: 11, color: 'var(--dim)' }}>vs {lastMonthKwh.toFixed(1)} kWh</span>
-              )}
+            <div style={{ display: 'flex', flexDirection: 'column', gap: 4 }}>
+              <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
+                {monthTrend !== null && (
+                  <ColorBadge color={monthTrend > 0 ? COLOR_DANGER : COLOR_SUCCESS}>
+                    {monthTrend > 0 ? '↑' : '↓'} {Math.abs(monthTrend).toFixed(1)}%
+                  </ColorBadge>
+                )}
+                {lastMonthKwh > 0 && (
+                  <span style={{ fontSize: 11, color: 'var(--dim)' }}>vs {lastMonthKwh.toFixed(1)} kWh</span>
+                )}
+              </div>
+              <span style={{ fontSize: 10, color: 'var(--dim2)' }}>{periodRangeLabel}</span>
             </div>
           }
         />
 
         {/* Coste */}
         <StatCard
-          label={t('estimatedCost')}
-          value={estimatedCostEur !== null ? estimatedCostEur.toFixed(2) : '—'}
+          label={isRolling ? t('estimatedCost30d') : t('estimatedCost')}
+          value={bill !== null ? bill.total.toFixed(2) : '—'}
           unit="€"
           icon={<DollarSign size={14} color="#34d399" />}
           iconBg="rgba(52,211,153,0.1)"
           meta={
             <div>
+              {bill !== null && (
+                <div style={{ display: 'flex', gap: 8, marginBottom: 4 }}>
+                  <span style={{ fontSize: 10, color: 'var(--dim)' }}>{t('energyCostLabel', { value: bill.energyCost.toFixed(2) })}</span>
+                  {bill.powerCost > 0 && (
+                    <span style={{ fontSize: 10, color: 'var(--dim)' }}>{t('powerCostLabel', { value: bill.powerCost.toFixed(2) })}</span>
+                  )}
+                </div>
+              )}
               <span style={{ fontSize: 11, color: 'var(--dim)' }}>{t('avgPrice')} </span>
               <span style={{ fontSize: 11, color: 'var(--muted-c)', fontFamily: 'var(--font-mono)' }}>
                 {avgPvpc !== null ? avgPvpc.toFixed(5) : '—'} €/kWh
               </span>
-              <div style={{ fontSize: 10.5, color: 'var(--dim2)', fontStyle: 'italic', marginTop: 2 }}>{t('energyOnly')}</div>
+              <div style={{ fontSize: 10, color: 'var(--dim2)', fontStyle: 'italic', marginTop: 2 }}>
+                {bill !== null && bill.powerCost > 0 ? t('inclTaxesAndPower') : bill !== null ? t('inclTaxes') : t('energyOnly')}
+              </div>
+              <div style={{ fontSize: 10, color: 'var(--dim2)', marginTop: 1 }}>{periodRangeLabel}</div>
             </div>
           }
         />
@@ -256,6 +315,7 @@ export default async function HomePage({ searchParams }: { searchParams: { cups?
         <StatCard
           label={t('lastData')}
           value={latestDatetime ? format(new Date(latestDatetime), 'dd MMM HH:mm') : tc('noData')}
+          valueFontSize={22}
           icon={<Clock size={14} color={COLOR_CYAN} />}
           iconBg="rgba(56,189,248,0.1)"
           meta={
@@ -328,15 +388,38 @@ export default async function HomePage({ searchParams }: { searchParams: { cups?
         </div>
       )}
 
+      {/* Tendencia anual */}
+      {annual12mData.length > 1 && (() => {
+        const avgMonthKwh = annual12mData.reduce((s, d) => s + d.totalKwh, 0) / annual12mData.length
+        return (
+          <div style={{
+            background: 'var(--card-grad)', border: '1px solid var(--border-c)',
+            borderRadius: 12, padding: '14px 18px', boxShadow: 'var(--shadow-card)',
+          }}>
+            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 10 }}>
+              <div style={{ fontSize: 10.5, fontWeight: 600, color: 'var(--dim)', textTransform: 'uppercase', letterSpacing: '0.1em' }}>
+                {t('annualTrend')}
+              </div>
+              <span style={{ fontSize: 10.5, color: 'var(--dim2)', fontFamily: 'var(--font-mono)' }}>
+                {t('avgMonthKwh', { avg: avgMonthKwh.toFixed(0) })}
+              </span>
+            </div>
+            <HomeMonthlyChart data={annual12mData} avgKwh={avgMonthKwh} />
+          </div>
+        )
+      })()}
+
       {/* Objetivo mensual */}
       {profile?.monthly_kwh_target && profile.monthly_kwh_target > 0 && (() => {
         const target = profile.monthly_kwh_target
         const pct = Math.min((thisMonthKwh / target) * 100, 110)
-        const daysInMonth = new Date(now.getFullYear(), now.getMonth() + 1, 0).getDate()
-        const daysElapsed = now.getDate()
-        const projected = daysElapsed > 0 ? (thisMonthKwh / daysElapsed) * daysInMonth : 0
-        const willExceed = projected > target
         const barColor = pct > 100 ? COLOR_DANGER : pct > 80 ? COLOR_WARNING : COLOR_SUCCESS
+
+        // Rolling mode: 30-day window is already complete — no projection needed
+        const daysInMonth = isRolling ? 30 : new Date(now.getFullYear(), now.getMonth() + 1, 0).getDate()
+        const daysElapsed = isRolling ? 30 : now.getDate()
+        const projected = isRolling ? thisMonthKwh : (daysElapsed > 0 ? (thisMonthKwh / daysElapsed) * daysInMonth : 0)
+        const willExceed = projected > target
         return (
           <div style={{
             background: 'var(--card-grad)', border: `1px solid ${pct > 100 ? 'rgba(248,113,113,0.3)' : 'var(--border-c)'}`,
@@ -345,7 +428,7 @@ export default async function HomePage({ searchParams }: { searchParams: { cups?
             <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: 10 }}>
               <div>
                 <div style={{ fontSize: 10.5, fontWeight: 600, color: 'var(--dim)', textTransform: 'uppercase', letterSpacing: '0.1em', marginBottom: 3 }}>
-                  {t('monthlyTarget')}
+                  {isRolling ? t('monthlyTarget30d') : t('monthlyTarget')}
                 </div>
                 <div style={{ display: 'flex', alignItems: 'baseline', gap: 6 }}>
                   <span style={{ fontSize: 20, fontWeight: 700, color: barColor, fontFamily: 'var(--font-mono)' }}>{thisMonthKwh.toFixed(1)}</span>
@@ -355,7 +438,7 @@ export default async function HomePage({ searchParams }: { searchParams: { cups?
               </div>
               {willExceed && (
                 <div style={{ fontSize: 10.5, padding: '4px 10px', borderRadius: 6, background: 'rgba(248,113,113,0.12)', color: COLOR_DANGER, border: '1px solid rgba(248,113,113,0.25)', fontWeight: 500, flexShrink: 0 }}>
-                  {t('forecast', { value: projected.toFixed(0) })}
+                  {isRolling ? t('targetExceeded') : t('forecast', { value: projected.toFixed(0) })}
                 </div>
               )}
             </div>
@@ -367,7 +450,9 @@ export default async function HomePage({ searchParams }: { searchParams: { cups?
               }} />
             </div>
             <div style={{ fontSize: 10.5, color: 'var(--dim)', marginTop: 6 }}>
-              {t('daysProgress', { elapsed: daysElapsed, total: daysInMonth, remaining: (target - thisMonthKwh).toFixed(1) })}
+              {isRolling
+                ? t('rollingProgress', { remaining: Math.max(0, target - thisMonthKwh).toFixed(1) })
+                : t('daysProgress', { elapsed: daysElapsed, total: daysInMonth, remaining: (target - thisMonthKwh).toFixed(1) })}
             </div>
           </div>
         )

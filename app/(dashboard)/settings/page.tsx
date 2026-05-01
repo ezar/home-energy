@@ -24,6 +24,13 @@ export default async function ConfiguracionPage() {
         <p className="text-sm text-muted-foreground mt-1">Credenciales Datadis, suministros y notificaciones</p>
       </div>
       <ConfigForm profile={profile} supplies={supplies} />
+      {process.env.NEXT_PUBLIC_BUILD_VERSION && (
+        <div style={{ textAlign: 'center', paddingBottom: 8 }}>
+          <span style={{ fontSize: 11, color: 'var(--dim2)', fontFamily: 'var(--font-mono)', letterSpacing: '0.04em' }}>
+            v{process.env.NEXT_PUBLIC_BUILD_VERSION}
+          </span>
+        </div>
+      )}
     </div>
   )
 }

@@ -45,6 +45,7 @@ export function ConfigForm({ profile, supplies: initialSupplies }: ConfigFormPro
   const [powerKw, setPowerKw] = useState(profile?.power_kw?.toString() ?? '')
   const [powerPriceKwMonth, setPowerPriceKwMonth] = useState(profile?.power_price_eur_kw_month?.toString() ?? '')
   const [monthlyTarget, setMonthlyTarget] = useState(profile?.monthly_kwh_target?.toString() ?? '')
+  const [monthViewMode, setMonthViewMode] = useState<'calendar' | 'rolling_30d'>(profile?.month_view_mode ?? 'calendar')
 
   const [localSupplies, setLocalSupplies] = useState<UserSupplyRow[]>(initialSupplies)
   const [pushThreshold, setPushThreshold] = useState(profile?.push_price_threshold?.toString() ?? '')
@@ -109,6 +110,7 @@ export function ConfigForm({ profile, supplies: initialSupplies }: ConfigFormPro
       power_kw: parseFloat(powerKw) || null,
       power_price_eur_kw_month: parseFloat(powerPriceKwMonth) || null,
       monthly_kwh_target: parseFloat(monthlyTarget) || null,
+      month_view_mode: monthViewMode,
     }
 
     const { error } = await (supabase as any)
@@ -512,6 +514,31 @@ export function ConfigForm({ profile, supplies: initialSupplies }: ConfigFormPro
             <div style={{ maxWidth: 160 }}>
               <label style={LABEL}>{t('monthlyTargetKwh')}</label>
               <input style={{ ...INPUT, fontFamily: 'var(--font-mono)' }} value={monthlyTarget} onChange={e => setMonthlyTarget(e.target.value)} placeholder={t('monthlyTargetPlaceholder')} type="number" step="10" min="0" />
+            </div>
+          </div>
+
+          <div style={{ borderTop: '1px solid var(--border-subtle)', paddingTop: 14, marginTop: 4 }}>
+            <div style={{ fontSize: 11, color: 'var(--dim)', marginBottom: 10 }}>
+              {t('monthViewMode')} <span style={{ color: 'var(--dim2)' }}>{t('monthViewModeNote')}</span>
+            </div>
+            <div style={{ display: 'flex', gap: 8 }}>
+              {(['calendar', 'rolling_30d'] as const).map(mode => (
+                <button
+                  key={mode}
+                  type="button"
+                  onClick={() => setMonthViewMode(mode)}
+                  style={{
+                    padding: '6px 14px', borderRadius: 8, cursor: 'pointer',
+                    fontSize: 12, fontWeight: monthViewMode === mode ? 600 : 400,
+                    background: monthViewMode === mode ? 'rgba(245,158,11,0.12)' : 'var(--btn-bg)',
+                    color: monthViewMode === mode ? '#f59e0b' : 'var(--btn-text)',
+                    border: `1px solid ${monthViewMode === mode ? 'rgba(245,158,11,0.3)' : 'var(--btn-border)'}`,
+                    fontFamily: 'var(--font-sans)', transition: 'all 0.15s',
+                  }}
+                >
+                  {t(`monthViewMode_${mode}`)}
+                </button>
+              ))}
             </div>
           </div>
         </div>

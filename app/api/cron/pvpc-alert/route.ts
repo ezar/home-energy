@@ -31,6 +31,7 @@ export async function GET(request: NextRequest) {
     .select('id, push_subscription, push_price_threshold')
     .not('push_subscription', 'is', null)
     .not('push_price_threshold', 'is', null)
+    .limit(500)
 
   if (!profiles?.length) return NextResponse.json({ ok: true, sent: 0 })
 

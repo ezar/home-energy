@@ -185,7 +185,13 @@
     "dailyTrend": "Daily consumption this month",
     "tooltipConsumption": "Consumption",
     "tooltipDay": "Day {n}",
-    "avgDailyKwh": "Avg: {avg} kWh/day"
+    "avgDailyKwh": "Avg: {avg} kWh/day",
+    "annualTrend": "Annual trend · 12 months",
+    "avgMonthKwh": "Avg: {avg} kWh/month",
+    "inclTaxes": "Incl. IEE + VAT",
+    "inclTaxesAndPower": "Incl. power, IEE + VAT",
+    "energyCostLabel": "Energy: {value} €",
+    "powerCostLabel": "Power: {value} €"
   },
   "Settings": {
     "profile": "Profile",
@@ -348,6 +354,8 @@
     "statMostActiveDay": "Most active day",
     "statGlobalPeakHour": "Global peak hour",
     "anomaly": "{count, plural, one {⚠ # anomaly} other {⚠ # anomalies}}",
+    "anomalyDetail": "Anomalous days",
+    "anomalyExpected": "normal",
     "heatmapLow": "Low",
     "heatmapHigh": "High",
     "colHour": "Hour",

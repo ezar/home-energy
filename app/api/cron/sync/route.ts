@@ -38,6 +38,7 @@ export async function GET(request: NextRequest) {
     .select('id, datadis_username, datadis_password_encrypted, datadis_authorized_nif')
     .not('datadis_username', 'is', null)
     .not('datadis_password_encrypted', 'is', null)
+    .limit(500)
 
   if (error || !profiles) {
     return NextResponse.json({ error: 'Error obteniendo perfiles' }, { status: 500 })

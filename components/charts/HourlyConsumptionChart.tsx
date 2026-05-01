@@ -39,7 +39,7 @@ export function HourlyConsumptionChart({ data, showPvpc, ariaLabel = 'Gráfico d
   return (
     <div role="img" aria-label={ariaLabel}>
     <ResponsiveContainer width="100%" height={180}>
-      <ComposedChart data={data} margin={{ top: 4, right: showPvpc ? 44 : 8, bottom: 0, left: -10 }}>
+      <ComposedChart data={data} margin={{ top: 4, right: 8, bottom: 0, left: -10 }}>
         <defs>
           {([1, 2, 3] as const).map(p => (
             <linearGradient key={p} id={`hbar-${p}`} x1="0" y1="0" x2="0" y2="1">
@@ -52,7 +52,7 @@ export function HourlyConsumptionChart({ data, showPvpc, ariaLabel = 'Gráfico d
         <XAxis dataKey="hour" tick={{ fontSize: 10, fill: 'var(--dim)' }} tickLine={false} axisLine={false} interval={3} />
         <YAxis yAxisId="kwh" tick={{ fontSize: 10, fill: 'var(--dim)' }} tickLine={false} axisLine={false} tickFormatter={(v: number) => v.toFixed(1)} width={32} />
         {showPvpc && (
-          <YAxis yAxisId="pvpc" orientation="right" tick={{ fontSize: 10, fill: '#a78bfa' }} tickLine={false} axisLine={false} tickFormatter={(v: number) => v.toFixed(2)} width={44} />
+          <YAxis yAxisId="pvpc" orientation="right" tick={false} tickLine={false} axisLine={false} width={8} />
         )}
         <Tooltip content={<CustomTooltip />} />
         <Bar yAxisId="kwh" dataKey="consumptionKwh" radius={[2, 2, 0, 0]} maxBarSize={24}>

@@ -1,16 +1,19 @@
 'use client'
 
 import { useState } from 'react'
-import { usePathname } from 'next/navigation'
+import { usePathname, useRouter } from 'next/navigation'
 import { useTranslations } from 'next-intl'
 import { RefreshCw } from 'lucide-react'
 import { ThemeToggle } from '@/components/dashboard/ThemeToggle'
 import { SignOutButton } from '@/components/dashboard/SignOutButton'
 import { LanguageToggle } from '@/components/dashboard/LanguageToggle'
 
+const DATA_PAGES = new Set(['/', '/consumption', '/cost', '/pvpc'])
+
 export function Topbar() {
   const [syncing, setSyncing] = useState(false)
   const pathname = usePathname()
+  const router = useRouter()
   const t = useTranslations('Topbar')
 
   const pageTitles: Record<string, { title: string; sub: string }> = {
@@ -24,6 +27,7 @@ export function Topbar() {
   }
 
   const meta = pageTitles[pathname] ?? { title: t('defaultTitle'), sub: '' }
+  const showSync = DATA_PAGES.has(pathname)
 
   async function handleSync() {
     setSyncing(true)
@@ -31,6 +35,7 @@ export function Topbar() {
       await fetch('/api/datadis/sync', { method: 'POST' })
     } finally {
       setSyncing(false)
+      router.refresh()
     }
   }
 
@@ -53,22 +58,26 @@ export function Topbar() {
         <span className="topbar-date" style={{ fontSize: 11, color: 'var(--dim)', whiteSpace: 'nowrap' }}>
           {now}
         </span>
-        <button
-          onClick={handleSync}
-          disabled={syncing}
-          style={{
-            display: 'inline-flex', alignItems: 'center', gap: 5,
-            padding: '5px 10px', borderRadius: 8,
-            background: 'var(--btn-bg)', color: 'var(--btn-text)',
-            border: '1px solid var(--btn-border)',
-            fontSize: 11.5, fontWeight: 500, cursor: 'pointer',
-            fontFamily: 'var(--font-sans)',
-            transition: 'all 0.15s', whiteSpace: 'nowrap',
-          }}
-        >
-          <RefreshCw size={11} className={syncing ? 'spin' : ''} />
-          <span className="topbar-date">{syncing ? t('syncing') : t('sync')}</span>
-        </button>
+        {showSync && (
+          <button
+            onClick={handleSync}
+            disabled={syncing}
+            title={syncing ? t('syncing') : t('sync')}
+            style={{
+              height: 32, padding: '0 8px',
+              minWidth: 32, borderRadius: 8,
+              display: 'inline-flex', alignItems: 'center', gap: 5,
+              background: 'var(--btn-bg)', color: 'var(--btn-text)',
+              border: '1px solid var(--btn-border)',
+              fontSize: 11.5, fontWeight: 500, cursor: 'pointer',
+              fontFamily: 'var(--font-sans)',
+              transition: 'all 0.15s', whiteSpace: 'nowrap',
+            }}
+          >
+            <RefreshCw size={14} className={syncing ? 'spin' : ''} />
+            <span className="topbar-date">{syncing ? t('syncing') : t('sync')}</span>
+          </button>
+        )}
         <LanguageToggle />
         <ThemeToggle />
         <SignOutButton />
