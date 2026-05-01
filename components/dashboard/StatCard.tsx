@@ -4,13 +4,14 @@ interface StatCardProps {
   label: string
   value: string
   unit?: string
+  valueFontSize?: number
   meta?: React.ReactNode
   icon: React.ReactNode
   iconBg: string
   accentBg?: string
 }
 
-export function StatCard({ label, value, unit, meta, icon, iconBg, accentBg }: StatCardProps) {
+export function StatCard({ label, value, unit, valueFontSize = 32, meta, icon, iconBg, accentBg }: StatCardProps) {
   return (
     <div style={{
       background: accentBg ?? 'var(--card-grad)',
@@ -43,7 +44,7 @@ export function StatCard({ label, value, unit, meta, icon, iconBg, accentBg }: S
         </div>
       </div>
       <div style={{ display: 'flex', alignItems: 'baseline', gap: 4, flexWrap: 'nowrap', minWidth: 0 }}>
-        <span style={{ fontSize: 32, fontWeight: 700, color: 'var(--text)', letterSpacing: '-0.03em', fontFamily: 'var(--font-mono)', whiteSpace: 'nowrap' }}>
+        <span style={{ fontSize: valueFontSize, fontWeight: 700, color: 'var(--text)', letterSpacing: '-0.03em', fontFamily: 'var(--font-mono)', whiteSpace: 'nowrap' }}>
           {value}
         </span>
         {unit && <span style={{ fontSize: 15, fontWeight: 400, color: 'var(--muted-c)', fontFamily: 'var(--font-sans)', whiteSpace: 'nowrap' }}>{unit}</span>}

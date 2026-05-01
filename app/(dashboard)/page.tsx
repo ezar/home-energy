@@ -16,7 +16,7 @@ import { PERIOD_COLORS, COLOR_SUCCESS, COLOR_DANGER, COLOR_WARNING, COLOR_INFO, 
 
 export const dynamic = 'force-dynamic'
 
-type MonthRow = Pick<ConsumptionRow, 'consumption_kwh' | 'datetime'>
+type MonthRow = Pick<ConsumptionRow, 'consumption_kwh' | 'period' | 'datetime'>
 type LatestRow = Pick<ConsumptionRow, 'datetime'>
 type PvpcRow = Pick<PvpcPriceRow, 'price_eur_kwh' | 'datetime'>
 type Appliance = { name: string; duration: number; icon: string; color: string }
@@ -48,7 +48,7 @@ export default async function HomePage({ searchParams }: { searchParams: { cups?
   const startToday = startOfDay(now).toISOString()
   const endTomorrow = startOfDay(addDays(now, 2)).toISOString()
 
-  let qThisMonth = supabase.from('consumption').select('consumption_kwh, datetime').eq('user_id', user.id).gte('datetime', startThisMonth).limit(3000)
+  let qThisMonth = supabase.from('consumption').select('consumption_kwh, period, datetime').eq('user_id', user.id).gte('datetime', startThisMonth).limit(3000)
   if (selectedCups) qThisMonth = qThisMonth.eq('cups', selectedCups)
 
   let qLastMonth = supabase.from('consumption').select('consumption_kwh').eq('user_id', user.id).gte('datetime', startLastMonth).lt('datetime', endLastMonthSamePeriod).limit(3000)
@@ -57,7 +57,7 @@ export default async function HomePage({ searchParams }: { searchParams: { cups?
   let qLatest = supabase.from('consumption').select('datetime').eq('user_id', user.id).order('datetime', { ascending: false }).limit(1)
   if (selectedCups) qLatest = qLatest.eq('cups', selectedCups)
 
-  const [profileResult, thisMonthResult, lastMonthResult, latestResult, pvpcNowResult, pvpc24hResult, pvpcTodayResult, suppliesResult] =
+  const [profileResult, thisMonthResult, lastMonthResult, latestResult, pvpcNowResult, pvpc24hResult, pvpcTodayResult, pvpcMonthResult, suppliesResult] =
     await Promise.all([
       supabase.from('profiles').select('last_sync_at, cups, distributor_code, tariff_type, price_p1_eur_kwh, price_p2_eur_kwh, price_p3_eur_kwh, power_kw, power_price_eur_kw_month, monthly_kwh_target').eq('id', user.id).single(),
       qThisMonth,
@@ -66,6 +66,7 @@ export default async function HomePage({ searchParams }: { searchParams: { cups?
       supabase.from('pvpc_prices').select('price_eur_kwh, datetime').order('datetime', { ascending: false }).limit(1),
       supabase.from('pvpc_prices').select('price_eur_kwh, datetime').gte('datetime', start24h).order('datetime', { ascending: true }),
       supabase.from('pvpc_prices').select('price_eur_kwh, datetime').gte('datetime', startToday).lt('datetime', endTomorrow).order('datetime', { ascending: true }),
+      supabase.from('pvpc_prices').select('price_eur_kwh, datetime').gte('datetime', startThisMonth).order('datetime', { ascending: true }).limit(1000),
       supabase.from('user_supplies').select('cups, display_name').eq('user_id', user.id).eq('is_active', true),
     ])
 
@@ -76,6 +77,7 @@ export default async function HomePage({ searchParams }: { searchParams: { cups?
   const pvpcNow = ((pvpcNowResult.data ?? []) as PvpcRow[])[0] ?? null
   const pvpc24h = (pvpc24hResult.data ?? []) as PvpcRow[]
   const pvpcToday = (pvpcTodayResult.data ?? []) as PvpcRow[]
+  const pvpcMonth = (pvpcMonthResult.data ?? []) as PvpcRow[]
   const supplies = (suppliesResult.data ?? []) as Pick<UserSupplyRow, 'cups' | 'display_name'>[]
 
   const t = await getTranslations('Home')
@@ -89,8 +91,25 @@ export default async function HomePage({ searchParams }: { searchParams: { cups?
 
   const thisMonthKwh = thisMonthRows.reduce((s, r) => s + r.consumption_kwh, 0)
   const lastMonthKwh = lastMonthRows.reduce((s, r) => s + r.consumption_kwh, 0)
-  const estimatedCostEur = pvpcNow ? thisMonthKwh * pvpcNow.price_eur_kwh : null
-  const avgPvpc = pvpcNow ? pvpcNow.price_eur_kwh : null
+
+  // Weighted cost: each hour × its own PVPC price (same logic as the Cost page)
+  const pvpcMonthMap = new Map(pvpcMonth.map(p => [p.datetime, p.price_eur_kwh]))
+  let estimatedCostEur: number | null = null
+  let costCoveredKwh = 0
+  if (pvpcMonth.length > 0 || tariffConfig.tariffType === 'fixed') {
+    let total = 0
+    for (const r of thisMonthRows) {
+      const pvpcPrice = pvpcMonthMap.get(r.datetime) ?? null
+      const period = (r.period ?? 3) as 1 | 2 | 3
+      const price = getEnergyPrice(period, pvpcPrice, tariffConfig)
+      total += r.consumption_kwh * price
+      if (pvpcPrice !== null || tariffConfig.tariffType === 'fixed') costCoveredKwh += r.consumption_kwh
+    }
+    estimatedCostEur = total
+  }
+  const avgPvpc = costCoveredKwh > 0 && estimatedCostEur !== null
+    ? estimatedCostEur / costCoveredKwh
+    : (pvpcNow?.price_eur_kwh ?? null)
   const monthTrend = lastMonthKwh > 0 ? ((thisMonthKwh - lastMonthKwh) / lastMonthKwh) * 100 : null
   const latestDatetime = latestRows[0]?.datetime ?? null
 
@@ -254,8 +273,9 @@ export default async function HomePage({ searchParams }: { searchParams: { cups?
 
         {/* Último dato */}
         <StatCard
-          label={latestDatetime ? `${t('lastData')} · ${format(new Date(latestDatetime), 'dd MMM')}` : t('lastData')}
-          value={latestDatetime ? format(new Date(latestDatetime), 'HH:mm') : tc('noData')}
+          label={t('lastData')}
+          value={latestDatetime ? format(new Date(latestDatetime), 'dd MMM HH:mm') : tc('noData')}
+          valueFontSize={22}
           icon={<Clock size={14} color={COLOR_CYAN} />}
           iconBg="rgba(56,189,248,0.1)"
           meta={
