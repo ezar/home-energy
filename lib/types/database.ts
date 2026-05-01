@@ -23,9 +23,9 @@ export interface Database {
           power_kw: number | null
           power_price_eur_kw_month: number | null
           monthly_kwh_target: number | null
+          month_view_mode: 'calendar' | 'rolling_30d'
           push_subscription: Record<string, unknown> | null
           push_price_threshold: number | null
-          month_view_mode: 'calendar' | 'rolling_30d'
         }
         Insert: {
           id: string
@@ -46,9 +46,9 @@ export interface Database {
           power_kw?: number | null
           power_price_eur_kw_month?: number | null
           monthly_kwh_target?: number | null
+          month_view_mode?: 'calendar' | 'rolling_30d'
           push_subscription?: Record<string, unknown> | null
           push_price_threshold?: number | null
-          month_view_mode?: 'calendar' | 'rolling_30d'
         }
         Update: {
           id?: string
@@ -69,9 +69,9 @@ export interface Database {
           power_kw?: number | null
           power_price_eur_kw_month?: number | null
           monthly_kwh_target?: number | null
+          month_view_mode?: 'calendar' | 'rolling_30d'
           push_subscription?: Record<string, unknown> | null
           push_price_threshold?: number | null
-          month_view_mode?: 'calendar' | 'rolling_30d'
         }
         Relationships: []
       }

@@ -28,6 +28,7 @@ export function ConsumptionView({ hourlyData, dailyData, monthlyData }: Props) {
   const [showPvpc, setShowPvpc] = useState(false)
   const [hourlyDays, setHourlyDays] = useState<7 | 14 | 30>(7)
   const [dailyDays, setDailyDays] = useState<30 | 60 | 90>(90)
+  const [showAnomalies, setShowAnomalies] = useState(false)
 
   const filteredHourly = useMemo(() => {
     const cutoff = new Date()
@@ -264,9 +265,13 @@ export function ConsumptionView({ hourlyData, dailyData, monthlyData }: Props) {
                   {t('titleDaily')}
                 </div>
                 {anomalyCount > 0 && (
-                  <div style={{ fontSize: 10, fontWeight: 600, color: COLOR_DANGER, background: 'rgba(248,113,113,0.12)', border: '1px solid rgba(248,113,113,0.25)', borderRadius: 5, padding: '2px 7px' }}>
+                  <button
+                    onClick={() => setShowAnomalies(v => !v)}
+                    style={{ fontSize: 10, fontWeight: 600, color: COLOR_DANGER, background: 'rgba(248,113,113,0.12)', border: '1px solid rgba(248,113,113,0.25)', borderRadius: 5, padding: '2px 7px', cursor: 'pointer', fontFamily: 'inherit', display: 'flex', alignItems: 'center', gap: 4 }}
+                  >
                     {t('anomaly', { count: anomalyCount })}
-                  </div>
+                    <span style={{ fontSize: 8 }}>{showAnomalies ? '▲' : '▼'}</span>
+                  </button>
                 )}
               </div>
               <div style={{ display: 'flex', gap: 3 }}>
@@ -276,6 +281,44 @@ export function ConsumptionView({ hourlyData, dailyData, monthlyData }: Props) {
               </div>
             </div>
             <DailyConsumptionChart data={filteredDaily} />
+            {anomalyCount > 0 && showAnomalies && (
+              <div style={{ marginTop: 12, borderTop: '1px solid var(--border-subtle)', paddingTop: 10 }}>
+                <div style={{ fontSize: 10, fontWeight: 600, color: 'var(--dim)', textTransform: 'uppercase', letterSpacing: '0.08em', marginBottom: 8 }}>
+                  {t('anomalyDetail')}
+                </div>
+                <div style={{ display: 'flex', flexDirection: 'column', gap: 0 }}>
+                  {filteredDaily
+                    .filter(d => d.isAnomalous)
+                    .sort((a, b) => b.totalKwh - a.totalKwh)
+                    .map(d => {
+                      const pct = d.avgForWeekday != null && d.avgForWeekday > 0
+                        ? Math.round(((d.totalKwh - d.avgForWeekday) / d.avgForWeekday) * 100)
+                        : null
+                      return (
+                        <div key={d.date} style={{ display: 'flex', alignItems: 'center', gap: 8, padding: '6px 0', borderBottom: '1px solid var(--border-subtle)' }}>
+                          <span style={{ fontSize: 11, fontFamily: 'var(--font-mono)', color: 'var(--dim)', minWidth: 52, flexShrink: 0 }}>
+                            {d.date.substring(5).replace('-', '/')}
+                          </span>
+                          <span style={{ fontSize: 12, fontWeight: 600, fontFamily: 'var(--font-mono)', color: COLOR_DANGER }}>
+                            {d.totalKwh.toFixed(2)} kWh
+                          </span>
+                          {d.avgForWeekday != null && (
+                            <span style={{ fontSize: 10, color: 'var(--dim2)', flex: 1 }}>
+                              {t('anomalyExpected')}: {d.avgForWeekday.toFixed(2)} kWh
+                            </span>
+                          )}
+                          {pct !== null && (
+                            <span style={{ fontSize: 11, fontWeight: 700, color: COLOR_DANGER, fontFamily: 'var(--font-mono)', flexShrink: 0 }}>
+                              +{pct}%
+                            </span>
+                          )}
+                        </div>
+                      )
+                    })
+                  }
+                </div>
+              </div>
+            )}
             {statRow([
               { label: t('statTotalPeriod'), val: dailyTotal.toFixed(1), unit: 'kWh', color: 'var(--text)' },
               { label: t('statDailyAvg'), val: filteredDaily.length ? (dailyTotal / filteredDaily.length).toFixed(2) : '—', unit: 'kWh', color: '#38bdf8' },
