@@ -150,12 +150,12 @@ export async function POST(request: Request) {
     send('info', `Rango: ${format(startDate, 'dd MMM yyyy', { locale: es })} → ${format(now, 'dd MMM yyyy', { locale: es })} (${months.length} mes${months.length !== 1 ? 'es' : ''})`)
 
     // ── Por suministro ────────────────────────────────────────────────
-    const allRows: ConsumptionInsert[] = []
+    let totalSaved = 0
 
     for (const supply of supplies) {
       send('info', `Suministro: ${supply.display_name ?? supply.cups}`)
 
-      // Consumo horario
+      // Consumo horario — guardado mes a mes para no perder progreso si hay timeout
       for (const monthStart of months) {
         const monthLabel = format(monthStart, 'MMM yyyy', { locale: es })
         send('info', `Consultando consumo ${monthLabel}...`)
@@ -170,19 +170,32 @@ export async function POST(request: Request) {
           authorizedNif: datadis_authorized_nif ?? undefined,
         })
 
-        const chunkCount = consumptionData.timeCurve?.length ?? 0
-        send('ok', `${monthLabel}: ${chunkCount} registros`)
-
-        for (const entry of consumptionData.timeCurve ?? []) {
+        const monthRows: ConsumptionInsert[] = (consumptionData.timeCurve ?? []).map(entry => {
           const datetime = datadisDatetimeToDate(entry.date, entry.time)
-          allRows.push({
+          return {
             user_id: user.id,
             cups: supply.cups,
             datetime: datetime.toISOString(),
             consumption_kwh: entry.consumptionKWh,
             period: getPeriod(datetime),
             obtained_by_real_or_max: entry.obtainMethod === 'Real',
-          })
+          }
+        })
+
+        if (monthRows.length === 0) {
+          send('info', `${monthLabel}: sin datos`)
+          continue
+        }
+
+        const { error: upsertErr } = await (serviceClient as any)
+          .from('consumption')
+          .upsert(monthRows, { onConflict: 'user_id,cups,datetime' })
+
+        if (upsertErr) {
+          send('warn', `${monthLabel}: error guardando — ${(upsertErr as { message: string }).message}`)
+        } else {
+          totalSaved += monthRows.length
+          send('ok', `${monthLabel}: ${monthRows.length} registros guardados`)
         }
       }
 
@@ -223,24 +236,16 @@ export async function POST(request: Request) {
       }
     }
 
-    // ── Guardar consumo ───────────────────────────────────────────────
-    if (allRows.length === 0) {
+    // ── Finalizar ─────────────────────────────────────────────────────
+    if (totalSaved === 0) {
       send('warn', 'Sin datos de consumo en el rango — puede ser retraso de Datadis (~2 días)')
       await (serviceClient as any).from('profiles').update({ last_sync_at: now.toISOString() }).eq('id', user.id)
       send('done', 'Sync completado (0 registros nuevos)')
       return
     }
 
-    send('info', `Guardando ${allRows.length} registros de consumo...`)
-
-    const { error: upsertError } = await (serviceClient as any)
-      .from('consumption')
-      .upsert(allRows, { onConflict: 'user_id,cups,datetime' })
-
-    if (upsertError) throw new Error(`Error guardando: ${(upsertError as { message: string }).message}`)
-
     await (serviceClient as any).from('profiles').update({ last_sync_at: now.toISOString() }).eq('id', user.id)
 
-    send('done', `✓ Sync completado — ${allRows.length} registros guardados`)
+    send('done', `✓ Sync completado — ${totalSaved} registros guardados`)
   })
 }
