@@ -277,7 +277,7 @@ export default async function OffersPage() {
         </div>
         <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
           {([
-            { label: 'CNMC — Comparador de Ofertas de Luz', href: 'https://comparador.cnmc.es', desc: t('cnmcDesc') },
+            { label: 'CNMC — Comparador de Ofertas de Luz', href: 'https://www.cnmc.es', desc: t('cnmcDesc') },
           ] as { label: string; href: string; desc: string }[]).map(({ label, href, desc }) => (
             <a key={href} href={href} target="_blank" rel="noopener noreferrer" style={{ textDecoration: 'none' }}>
               <div style={{
