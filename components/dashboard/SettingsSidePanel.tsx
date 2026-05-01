@@ -24,7 +24,7 @@ interface Props {
   deleting: boolean
   deleteMsg: string | null
   onSyncDatadis: (months?: number) => void
-  onSyncPvpc: () => void
+  onSyncPvpc: (months?: number) => void
   onToggleSupply: (id: string, isActive: boolean) => void
   onDeleteSupply: (id: string) => void
   onSetPushThreshold: (v: string) => void
@@ -71,7 +71,7 @@ export function SettingsSidePanel({
             {syncingDatadis ? <Loader2 size={11} className="spin" /> : <RefreshCw size={11} />}
             {syncingDatadis ? t('reloading') : t('reloadDatadis')}
           </button>
-          <button style={BTN_DEFAULT} onClick={onSyncPvpc} disabled={syncingPvpc} type="button">
+          <button style={BTN_DEFAULT} onClick={() => onSyncPvpc()} disabled={syncingPvpc} type="button">
             {syncingPvpc ? <Loader2 size={11} className="spin" /> : <Zap size={11} />}
             {syncingPvpc ? t('reloadingPvpc') : t('reloadPvpc')}
           </button>

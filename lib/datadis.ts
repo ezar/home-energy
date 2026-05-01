@@ -48,11 +48,9 @@ async function datadisGet<T>(token: string, path: string, params: Record<string,
   if (res.status === 401) throw new Error('Datadis token expirado o inválido')
 
   if (res.status === 429) {
-    // Un solo reintento con pausa larga — reintentos cortos no sirven si la
-    // ventana de rate limit de Datadis es de decenas de segundos
-    if (attempt > 1) throw new Error('Datadis rate limit superado — espera un momento e inténtalo de nuevo')
-    await delay(20000)
-    return datadisGet<T>(token, path, params, attempt + 1)
+    // No reintentamos: el límite de Datadis es diario (no por segundo).
+    // Reintentar solo consume más cuota del mismo día.
+    throw new Error('DATADIS_429')
   }
 
   if (!res.ok) throw new Error(`Datadis error ${res.status} en ${path}`)

@@ -286,7 +286,7 @@
     "validationDistributorFormat": "Distributor code must be numeric",
     "datadisNote": "Datadis can have up to 2 days delay and limits to ~1 request/day per endpoint. If you see error 429, wait 24h. The automatic cron runs at 05:00.",
     "historyLoad": "Load historical data",
-    "historyLoadNote": "Forces a full re-sync from Datadis for the selected period. Each month uses one API call — Datadis limits ~1 request/day per endpoint.",
+    "historyLoadNote": "Fetches consumption from Datadis and PVPC prices from REData for the selected period. Datadis has a daily request quota — if it hits the limit, the months already fetched are saved and PVPC prices are synced regardless.",
     "historyOption": "{months, plural, one {Last month} other {Last {months} months}}",
     "historyStart": "Load",
     "dangerZone": "Danger zone",

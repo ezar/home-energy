@@ -38,7 +38,7 @@ function makeStream(run: (send: (type: LogType, msg: string) => void) => Promise
   return new Response(stream, { headers: SSE_HEADERS })
 }
 
-export async function POST() {
+export async function POST(request: Request) {
   const supabase = await createClient()
   const { data: { user }, error: authError } = await supabase.auth.getUser()
 
@@ -46,9 +46,12 @@ export async function POST() {
     return makeStream(async (send) => { send('error', 'No autenticado') })
   }
 
+  const bodyJson = await request.json().catch(() => ({})) as { months?: unknown }
+  const historyMonths = typeof bodyJson.months === 'number' && bodyJson.months > 0 ? bodyJson.months : 2
+
   return makeStream(async (send) => {
     const now = new Date()
-    const startDate = startOfMonth(subMonths(now, 2))
+    const startDate = startOfMonth(subMonths(now, historyMonths))
 
     send('info', `Consultando precios REData (${format(startDate, 'dd MMM', { locale: es })} → ${format(now, 'dd MMM yyyy', { locale: es })})...`)
 

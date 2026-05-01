@@ -286,7 +286,7 @@
     "validationDistributorFormat": "El código de distribuidora debe ser numérico",
     "datadisNote": "Datadis puede tener hasta 2 días de retraso y limita a ~1 petición/día por endpoint. Si ves error 429, espera 24h. El cron automático se ejecuta a las 05:00.",
     "historyLoad": "Carga de historial",
-    "historyLoadNote": "Fuerza una re-sincronización completa desde Datadis para el período seleccionado. Cada mes consume una petición — Datadis limita ~1 petición/día por endpoint.",
+    "historyLoadNote": "Descarga consumo de Datadis y precios PVPC de REData para el período seleccionado. Datadis tiene una cuota diaria de peticiones — si se alcanza, los meses ya descargados quedan guardados y los precios PVPC se sincronizan igualmente.",
     "historyOption": "{months, plural, one {Último mes} other {Últimos {months} meses}}",
     "historyStart": "Cargar",
     "dangerZone": "Zona de peligro",

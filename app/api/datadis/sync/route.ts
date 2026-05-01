@@ -4,14 +4,15 @@
 
 import { createClient, createServiceClient } from '@/lib/supabase/server'
 import { getToken, getConsumption, getMaxPower, datadisDatetimeToDate } from '@/lib/datadis'
+import { getPvpcPrices } from '@/lib/redata'
 import { getPeriod } from '@/lib/tariff'
 import { decrypt } from '@/lib/encrypt'
-import type { ProfileRow, ConsumptionInsert } from '@/lib/supabase/types-helper'
+import type { ProfileRow, ConsumptionInsert, PvpcPriceInsert } from '@/lib/supabase/types-helper'
 import { format, subMonths, subDays, startOfMonth, addMonths, parseISO, isBefore } from 'date-fns'
 import { es } from 'date-fns/locale'
 
 export const dynamic = 'force-dynamic'
-export const maxDuration = 60
+export const maxDuration = 120
 
 const SSE_HEADERS = {
   'Content-Type': 'text/event-stream',
@@ -156,19 +157,31 @@ export async function POST(request: Request) {
       send('info', `Suministro: ${supply.display_name ?? supply.cups}`)
 
       // Consumo horario — guardado mes a mes para no perder progreso si hay timeout
+      let datadisRateLimited = false
       for (const monthStart of months) {
         const monthLabel = format(monthStart, 'MMM yyyy', { locale: es })
         send('info', `Consultando consumo ${monthLabel}...`)
 
-        const consumptionData = await getConsumption(token, {
-          cups: supply.cups,
-          distributorCode: supply.distributor_code,
-          startDate: toDatadisMonth(monthStart),
-          endDate: toDatadisMonth(monthStart),
-          measurementType: '0',
-          pointType: String(supply.point_type ?? 5),
-          authorizedNif: datadis_authorized_nif ?? undefined,
-        })
+        let consumptionData
+        try {
+          consumptionData = await getConsumption(token, {
+            cups: supply.cups,
+            distributorCode: supply.distributor_code,
+            startDate: toDatadisMonth(monthStart),
+            endDate: toDatadisMonth(monthStart),
+            measurementType: '0',
+            pointType: String(supply.point_type ?? 5),
+            authorizedNif: datadis_authorized_nif ?? undefined,
+          })
+        } catch (err) {
+          if (err instanceof Error && err.message === 'DATADIS_429') {
+            send('warn', `Datadis: límite diario de peticiones alcanzado en ${monthLabel}. Los meses anteriores están guardados. Espera ~24h para continuar.`)
+            datadisRateLimited = true
+            break
+          }
+          send('warn', `${monthLabel}: error — ${err instanceof Error ? err.message : 'error desconocido'}`)
+          continue
+        }
 
         const monthRows: ConsumptionInsert[] = (consumptionData.timeCurve ?? []).map(entry => {
           const datetime = datadisDatetimeToDate(entry.date, entry.time)
@@ -198,6 +211,8 @@ export async function POST(request: Request) {
           send('ok', `${monthLabel}: ${monthRows.length} registros guardados`)
         }
       }
+
+      if (datadisRateLimited) break
 
       // Maxímetro (potencia máxima mensual)
       try {
@@ -236,16 +251,35 @@ export async function POST(request: Request) {
       }
     }
 
+    // ── Precios PVPC (REData) — mismo rango, independiente de si Datadis falló ──
+    try {
+      send('info', `Sincronizando precios PVPC (${format(startDate, 'MMM yyyy', { locale: es })} → ${format(now, 'MMM yyyy', { locale: es })})...`)
+      const pvpcPrices = await getPvpcPrices(startDate, now)
+      if (pvpcPrices.length > 0) {
+        const seen = new Map(pvpcPrices.map(p => [p.datetime, p]))
+        const pvpcRows: PvpcPriceInsert[] = Array.from(seen.values()).map(p => ({
+          datetime: p.datetime,
+          price_eur_kwh: p.priceEurKwh,
+        }))
+        await (serviceClient as any)
+          .from('pvpc_prices')
+          .upsert(pvpcRows, { onConflict: 'datetime' })
+        send('ok', `PVPC: ${pvpcRows.length} precios guardados`)
+      } else {
+        send('info', 'PVPC: sin precios en el rango')
+      }
+    } catch (err) {
+      send('warn', `PVPC: error sincronizando — ${err instanceof Error ? err.message : 'error'}`)
+    }
+
     // ── Finalizar ─────────────────────────────────────────────────────
+    await (serviceClient as any).from('profiles').update({ last_sync_at: now.toISOString() }).eq('id', user.id)
+
     if (totalSaved === 0) {
-      send('warn', 'Sin datos de consumo en el rango — puede ser retraso de Datadis (~2 días)')
-      await (serviceClient as any).from('profiles').update({ last_sync_at: now.toISOString() }).eq('id', user.id)
-      send('done', 'Sync completado (0 registros nuevos)')
+      send('done', 'Sync completado — 0 registros de consumo (puede ser retraso de Datadis ~2 días)')
       return
     }
 
-    await (serviceClient as any).from('profiles').update({ last_sync_at: now.toISOString() }).eq('id', user.id)
-
-    send('done', `✓ Sync completado — ${totalSaved} registros guardados`)
+    send('done', `✓ Sync completado — ${totalSaved} registros de consumo guardados`)
   })
 }
