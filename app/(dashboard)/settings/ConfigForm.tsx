@@ -160,14 +160,19 @@ export function ConfigForm({ profile, supplies: initialSupplies }: ConfigFormPro
     }
   }
 
-  async function handleSyncDatadis() {
+  async function handleSyncDatadis(months?: number) {
     syncAbortRef.current?.abort()
     const controller = new AbortController()
     syncAbortRef.current = controller
     setSyncingDatadis(true)
     setSyncLogs([])
     try {
-      const res = await fetch('/api/datadis/sync', { method: 'POST', signal: controller.signal })
+      const res = await fetch('/api/datadis/sync', {
+        method: 'POST',
+        headers: months ? { 'Content-Type': 'application/json' } : undefined,
+        body: months ? JSON.stringify({ months }) : undefined,
+        signal: controller.signal,
+      })
       if (!res.body) throw new Error('Sin respuesta del servidor')
 
       const reader = res.body.getReader()
@@ -571,7 +576,7 @@ export function ConfigForm({ profile, supplies: initialSupplies }: ConfigFormPro
         pushThreshold={pushThreshold}
         deleting={deleting}
         deleteMsg={deleteMsg}
-        onSyncDatadis={handleSyncDatadis}
+        onSyncDatadis={(months) => handleSyncDatadis(months)}
         onSyncPvpc={handleSyncPvpc}
         onToggleSupply={handleToggleSupply}
         onDeleteSupply={handleDeleteSupply}

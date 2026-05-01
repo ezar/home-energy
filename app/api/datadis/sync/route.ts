@@ -66,7 +66,7 @@ function makeStream(run: (send: (type: LogType, msg: string) => void) => Promise
   return new Response(stream, { headers: SSE_HEADERS })
 }
 
-export async function POST() {
+export async function POST(request: Request) {
   const supabase = await createClient()
   const { data: { user }, error: authError } = await supabase.auth.getUser()
 
@@ -92,8 +92,11 @@ export async function POST() {
 
   const { datadis_username, datadis_password_encrypted, datadis_authorized_nif, last_sync_at } = profile
 
+  const bodyJson = await request.json().catch(() => ({})) as { months?: unknown }
+  const historyMonths = typeof bodyJson.months === 'number' && bodyJson.months > 0 ? bodyJson.months : 0
+
   return makeStream(async (send) => {
-    if (last_sync_at) {
+    if (!historyMonths && last_sync_at) {
       const hoursSince = (Date.now() - new Date(last_sync_at).getTime()) / 3_600_000
       if (hoursSince < 20) {
         send('warn', `Última sync hace ${hoursSince.toFixed(1)}h — Datadis limita ~1 petición/día por endpoint. Si da 429 es normal.`)
@@ -131,9 +134,11 @@ export async function POST() {
 
     // ── Rango de fechas ───────────────────────────────────────────────
     const now = new Date()
-    const startDate = last_sync_at
-      ? subDays(parseISO(last_sync_at), 5)
-      : startOfMonth(subMonths(now, 2))
+    const startDate = historyMonths > 0
+      ? startOfMonth(subMonths(now, historyMonths))
+      : last_sync_at
+        ? subDays(parseISO(last_sync_at), 5)
+        : startOfMonth(subMonths(now, 2))
 
     const months: Date[] = []
     let cursor = startOfMonth(startDate)

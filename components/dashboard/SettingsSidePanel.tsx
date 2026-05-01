@@ -1,7 +1,8 @@
 'use client'
 
+import { useState } from 'react'
 import { useTranslations } from 'next-intl'
-import { Loader2, CheckCircle2, AlertCircle, RefreshCw, Zap, Info } from 'lucide-react'
+import { Loader2, CheckCircle2, AlertCircle, RefreshCw, Zap, Info, History } from 'lucide-react'
 import type { UserSupplyRow } from '@/lib/supabase/types-helper'
 import { ColorBadge } from '@/components/dashboard/PeriodBadge'
 import { CARD_STYLE as CARD, LABEL_STYLE as LABEL, SECTION_LABEL_STYLE as SECTION_LABEL, BTN_DEFAULT_STYLE as BTN_DEFAULT, BTN_PRIMARY_STYLE as BTN_PRIMARY, INPUT_STYLE as INPUT } from '@/lib/ui-styles'
@@ -22,7 +23,7 @@ interface Props {
   pushThreshold: string
   deleting: boolean
   deleteMsg: string | null
-  onSyncDatadis: () => void
+  onSyncDatadis: (months?: number) => void
   onSyncPvpc: () => void
   onToggleSupply: (id: string, isActive: boolean) => void
   onDeleteSupply: (id: string) => void
@@ -30,6 +31,8 @@ interface Props {
   onPushToggle: () => void
   onDeleteData: () => void
 }
+
+const HISTORY_OPTIONS = [1, 3, 6, 12, 24] as const
 
 export function SettingsSidePanel({
   lastSync, profile, localSupplies,
@@ -41,6 +44,7 @@ export function SettingsSidePanel({
 }: Props) {
   const t = useTranslations('Settings')
   const tc = useTranslations('Common')
+  const [historyMonths, setHistoryMonths] = useState<number>(12)
 
   const dataUpTo = profile?.last_sync_at
     ? new Date(profile.last_sync_at).toLocaleString(undefined, { day: 'numeric', month: 'short', hour: '2-digit', minute: '2-digit' })
@@ -63,7 +67,7 @@ export function SettingsSidePanel({
         ))}
 
         <div style={{ display: 'flex', gap: 8, marginTop: 14, flexWrap: 'wrap' }}>
-          <button style={BTN_DEFAULT} onClick={onSyncDatadis} disabled={syncingDatadis} type="button">
+          <button style={BTN_DEFAULT} onClick={() => onSyncDatadis()} disabled={syncingDatadis} type="button">
             {syncingDatadis ? <Loader2 size={11} className="spin" /> : <RefreshCw size={11} />}
             {syncingDatadis ? t('reloading') : t('reloadDatadis')}
           </button>
@@ -71,6 +75,41 @@ export function SettingsSidePanel({
             {syncingPvpc ? <Loader2 size={11} className="spin" /> : <Zap size={11} />}
             {syncingPvpc ? t('reloadingPvpc') : t('reloadPvpc')}
           </button>
+        </div>
+
+        {/* Historical load */}
+        <div style={{ marginTop: 14, paddingTop: 12, borderTop: '1px solid var(--border-subtle)' }}>
+          <div style={{ fontSize: 10.5, fontWeight: 600, color: 'var(--dim)', textTransform: 'uppercase', letterSpacing: '0.08em', marginBottom: 8 }}>
+            {t('historyLoad')}
+          </div>
+          <div style={{ fontSize: 10.5, color: 'var(--dim2)', marginBottom: 10, lineHeight: 1.5 }}>
+            {t('historyLoadNote')}
+          </div>
+          <div style={{ display: 'flex', gap: 8, alignItems: 'center', flexWrap: 'wrap' }}>
+            <select
+              value={historyMonths}
+              onChange={e => setHistoryMonths(Number(e.target.value))}
+              disabled={syncingDatadis}
+              style={{
+                padding: '5px 8px', borderRadius: 7, fontSize: 12, fontFamily: 'var(--font-sans)',
+                background: 'var(--input-bg)', border: '1px solid var(--input-border)',
+                color: 'var(--text)', cursor: 'pointer',
+              }}
+            >
+              {HISTORY_OPTIONS.map(m => (
+                <option key={m} value={m}>{t('historyOption', { months: m })}</option>
+              ))}
+            </select>
+            <button
+              style={BTN_DEFAULT}
+              onClick={() => onSyncDatadis(historyMonths)}
+              disabled={syncingDatadis}
+              type="button"
+            >
+              {syncingDatadis ? <Loader2 size={11} className="spin" /> : <History size={11} />}
+              {syncingDatadis ? t('reloading') : t('historyStart')}
+            </button>
+          </div>
         </div>
 
         {syncLogs.length > 0 && (
