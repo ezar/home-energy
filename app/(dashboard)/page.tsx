@@ -372,11 +372,13 @@ export default async function HomePage({ searchParams }: { searchParams: { cups?
       {profile?.monthly_kwh_target && profile.monthly_kwh_target > 0 && (() => {
         const target = profile.monthly_kwh_target
         const pct = Math.min((thisMonthKwh / target) * 100, 110)
-        const daysInMonth = new Date(now.getFullYear(), now.getMonth() + 1, 0).getDate()
-        const daysElapsed = now.getDate()
-        const projected = daysElapsed > 0 ? (thisMonthKwh / daysElapsed) * daysInMonth : 0
-        const willExceed = projected > target
         const barColor = pct > 100 ? COLOR_DANGER : pct > 80 ? COLOR_WARNING : COLOR_SUCCESS
+
+        // Rolling mode: 30-day window is already complete — no projection needed
+        const daysInMonth = isRolling ? 30 : new Date(now.getFullYear(), now.getMonth() + 1, 0).getDate()
+        const daysElapsed = isRolling ? 30 : now.getDate()
+        const projected = isRolling ? thisMonthKwh : (daysElapsed > 0 ? (thisMonthKwh / daysElapsed) * daysInMonth : 0)
+        const willExceed = projected > target
         return (
           <div style={{
             background: 'var(--card-grad)', border: `1px solid ${pct > 100 ? 'rgba(248,113,113,0.3)' : 'var(--border-c)'}`,
@@ -385,7 +387,7 @@ export default async function HomePage({ searchParams }: { searchParams: { cups?
             <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: 10 }}>
               <div>
                 <div style={{ fontSize: 10.5, fontWeight: 600, color: 'var(--dim)', textTransform: 'uppercase', letterSpacing: '0.1em', marginBottom: 3 }}>
-                  {t('monthlyTarget')}
+                  {isRolling ? t('monthlyTarget30d') : t('monthlyTarget')}
                 </div>
                 <div style={{ display: 'flex', alignItems: 'baseline', gap: 6 }}>
                   <span style={{ fontSize: 20, fontWeight: 700, color: barColor, fontFamily: 'var(--font-mono)' }}>{thisMonthKwh.toFixed(1)}</span>
@@ -395,7 +397,7 @@ export default async function HomePage({ searchParams }: { searchParams: { cups?
               </div>
               {willExceed && (
                 <div style={{ fontSize: 10.5, padding: '4px 10px', borderRadius: 6, background: 'rgba(248,113,113,0.12)', color: COLOR_DANGER, border: '1px solid rgba(248,113,113,0.25)', fontWeight: 500, flexShrink: 0 }}>
-                  {t('forecast', { value: projected.toFixed(0) })}
+                  {isRolling ? t('targetExceeded') : t('forecast', { value: projected.toFixed(0) })}
                 </div>
               )}
             </div>
@@ -407,7 +409,9 @@ export default async function HomePage({ searchParams }: { searchParams: { cups?
               }} />
             </div>
             <div style={{ fontSize: 10.5, color: 'var(--dim)', marginTop: 6 }}>
-              {t('daysProgress', { elapsed: daysElapsed, total: daysInMonth, remaining: (target - thisMonthKwh).toFixed(1) })}
+              {isRolling
+                ? t('rollingProgress', { remaining: Math.max(0, target - thisMonthKwh).toFixed(1) })
+                : t('daysProgress', { elapsed: daysElapsed, total: daysInMonth, remaining: (target - thisMonthKwh).toFixed(1) })}
             </div>
           </div>
         )
