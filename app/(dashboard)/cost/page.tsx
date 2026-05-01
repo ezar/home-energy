@@ -31,7 +31,7 @@ export default async function CostePage({ searchParams }: { searchParams: { cups
   const selectedCups = searchParams.cups ?? null
   const now = new Date()
 
-  const [profileResult, maximeterResult, suppliesResult] = await Promise.all([
+  const [profileResult, maximeterResult, maximeter3mResult, suppliesResult] = await Promise.all([
     supabase
       .from('profiles')
       .select('tariff_type, price_p1_eur_kwh, price_p2_eur_kwh, price_p3_eur_kwh, power_kw, power_price_eur_kw_month, month_view_mode')
@@ -44,11 +44,19 @@ export default async function CostePage({ searchParams }: { searchParams: { cups
       if (selectedCups) q = q.eq('cups', selectedCups)
       return q
     })(),
+    (() => {
+      let q = supabase.from('maximeter').select('max_power_kw')
+        .eq('user_id', user.id).gte('datetime', startOfMonth(subMonths(now, 3)).toISOString())
+        .order('max_power_kw', { ascending: false }).limit(500)
+      if (selectedCups) q = q.eq('cups', selectedCups)
+      return q
+    })(),
     supabase.from('user_supplies').select('cups, display_name').eq('user_id', user.id).eq('is_active', true),
   ])
 
   type MaxRow = Pick<MaximeterRow, 'datetime' | 'max_power_kw' | 'period'>
   const maximeterRows = (maximeterResult.data ?? []) as MaxRow[]
+  const maximeter3mRows = (maximeter3mResult.data ?? []) as Pick<MaximeterRow, 'max_power_kw'>[]
   const supplies = (suppliesResult.data ?? []) as Pick<UserSupplyRow, 'cups' | 'display_name'>[]
 
   const profileData = (profileResult.data ?? {}) as Pick<ProfileRow,
@@ -376,6 +384,68 @@ export default async function CostePage({ searchParams }: { searchParams: { cups
                 {t('exceededWarning')}
               </p>
             )}
+          </div>
+        )
+      })()}
+
+      {/* Recomendación de potencia óptima */}
+      {maximeter3mRows.length > 0 && tariffConfig.powerKw && tariffConfig.powerKw > 0 && (() => {
+        const peak3m = maximeter3mRows[0].max_power_kw
+        const contracted = tariffConfig.powerKw!
+        const pricePerKw = tariffConfig.powerPriceEurKwMonth ?? 0
+
+        // Suggested power = peak with 20% safety margin, rounded to 0.01
+        const suggested = Math.ceil(peak3m * 1.2 * 100) / 100
+        const canDowngrade = suggested < contracted * 0.92 && pricePerKw > 0
+        const needsUpgrade = peak3m > contracted
+
+        if (!canDowngrade && !needsUpgrade) return null
+
+        const monthlySaving = canDowngrade ? (contracted - suggested) * pricePerKw : 0
+        const annualSaving = monthlySaving * 12
+        const upgradeKw = Math.ceil(peak3m * 1.1 * 100) / 100
+
+        const isDowngrade = canDowngrade && !needsUpgrade
+        const accentColor = isDowngrade ? '#34d399' : '#f59e0b'
+        const bgAlpha = isDowngrade ? 'rgba(52,211,153,0.08)' : 'rgba(245,158,11,0.08)'
+        const borderAlpha = isDowngrade ? 'rgba(52,211,153,0.25)' : 'rgba(245,158,11,0.25)'
+
+        return (
+          <div style={{ ...CARD, borderColor: borderAlpha, background: bgAlpha }}>
+            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: 12 }}>
+              <div style={{ fontSize: 10.5, fontWeight: 600, color: 'var(--dim)', textTransform: 'uppercase', letterSpacing: '0.1em' }}>
+                {t('powerRecommendation')}
+              </div>
+              <div style={{ fontSize: 10, color: 'var(--dim2)' }}>{t('powerPeriod')}</div>
+            </div>
+            <div style={{ display: 'flex', gap: 14, flexWrap: 'wrap', alignItems: 'flex-start' }}>
+              <div style={{ flex: '1 1 160px' }}>
+                <div style={{ fontSize: 22, fontWeight: 700, color: accentColor, fontFamily: 'var(--font-mono)', marginBottom: 4 }}>
+                  {isDowngrade ? suggested.toFixed(2) : upgradeKw.toFixed(2)}
+                  <span style={{ fontSize: 13, fontWeight: 400, color: 'var(--muted-c)', fontFamily: 'var(--font-sans)', marginLeft: 4 }}>kW</span>
+                </div>
+                <div style={{ fontSize: 11, color: 'var(--text-2)', fontWeight: 500, marginBottom: 4 }}>
+                  {isDowngrade ? t('powerDowngrade') : t('powerUpgradeNeeded')}
+                </div>
+                <div style={{ fontSize: 10.5, color: 'var(--dim)' }}>
+                  {t('powerPeak3m', { peak: peak3m.toFixed(3) })}
+                </div>
+              </div>
+              {isDowngrade && (
+                <div style={{ flex: '1 1 140px', padding: '10px 14px', borderRadius: 10, background: 'rgba(52,211,153,0.1)', border: '1px solid rgba(52,211,153,0.2)' }}>
+                  <div style={{ fontSize: 10, color: 'var(--dim)', marginBottom: 4 }}>{t('powerSavings')}</div>
+                  <div style={{ fontSize: 18, fontWeight: 700, color: '#34d399', fontFamily: 'var(--font-mono)' }}>
+                    {monthlySaving.toFixed(2)} €<span style={{ fontSize: 11, fontWeight: 400, color: 'var(--muted-c)', fontFamily: 'var(--font-sans)' }}>/mes</span>
+                  </div>
+                  <div style={{ fontSize: 10, color: 'var(--dim)', marginTop: 2 }}>
+                    {annualSaving.toFixed(0)} € {t('powerSavingsAnnual')}
+                  </div>
+                </div>
+              )}
+            </div>
+            <div style={{ fontSize: 10, color: 'var(--dim2)', marginTop: 10, lineHeight: 1.6 }}>
+              {isDowngrade ? t('powerSafeMargin') : t('powerUpgradeWarning')}
+            </div>
           </div>
         )
       })()}

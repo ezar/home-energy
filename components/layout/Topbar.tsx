@@ -3,18 +3,25 @@
 import { useState } from 'react'
 import { usePathname, useRouter } from 'next/navigation'
 import { useTranslations } from 'next-intl'
-import { RefreshCw } from 'lucide-react'
+import { RefreshCw, AlertTriangle } from 'lucide-react'
 import { ThemeToggle } from '@/components/dashboard/ThemeToggle'
 import { SignOutButton } from '@/components/dashboard/SignOutButton'
 import { LanguageToggle } from '@/components/dashboard/LanguageToggle'
 
 const DATA_PAGES = new Set(['/', '/consumption', '/cost', '/pvpc'])
+const STALE_THRESHOLD_DAYS = 3
 
-export function Topbar() {
+interface TopbarProps {
+  latestDataAt: string | null
+}
+
+export function Topbar({ latestDataAt }: TopbarProps) {
   const [syncing, setSyncing] = useState(false)
   const pathname = usePathname()
   const router = useRouter()
   const t = useTranslations('Topbar')
+
+  const staleData = !latestDataAt || (Date.now() - new Date(latestDataAt).getTime()) > STALE_THRESHOLD_DAYS * 86400000
 
   const pageTitles: Record<string, { title: string; sub: string }> = {
     '/':             { title: t('summaryTitle'),     sub: t('summarySub') },
@@ -58,6 +65,17 @@ export function Topbar() {
         <span className="topbar-date" style={{ fontSize: 11, color: 'var(--dim)', whiteSpace: 'nowrap' }}>
           {now}
         </span>
+        {staleData && (
+          <div title={t('staleData')} style={{
+            display: 'inline-flex', alignItems: 'center', gap: 4,
+            fontSize: 10.5, fontWeight: 500, color: '#f59e0b',
+            background: 'rgba(245,158,11,0.12)', border: '1px solid rgba(245,158,11,0.3)',
+            borderRadius: 6, padding: '3px 7px', whiteSpace: 'nowrap',
+          }}>
+            <AlertTriangle size={11} />
+            <span className="topbar-date">{t('staleData')}</span>
+          </div>
+        )}
         {showSync && (
           <button
             onClick={handleSync}

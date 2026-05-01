@@ -7,16 +7,17 @@ import { BottomNav } from './BottomNav'
 interface DashboardShellProps {
   children: React.ReactNode
   lastSyncAt: string | null
+  latestDataAt: string | null
 }
 
-export function DashboardShell({ children, lastSyncAt }: DashboardShellProps) {
+export function DashboardShell({ children, lastSyncAt, latestDataAt }: DashboardShellProps) {
   return (
     <div style={{ display: 'flex', height: '100svh', background: 'var(--bg0)' }}>
       <div className="sidebar-wrap">
         <Sidebar lastSyncAt={lastSyncAt} />
       </div>
       <div style={{ flex: 1, display: 'flex', flexDirection: 'column', overflow: 'hidden', minWidth: 0 }}>
-        <Topbar />
+        <Topbar latestDataAt={latestDataAt} />
         <main className="main-content" style={{ background: 'var(--bg0)' }}>
           <div className="page-enter">
             {children}
