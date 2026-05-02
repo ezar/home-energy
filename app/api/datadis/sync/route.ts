@@ -250,10 +250,13 @@ export async function POST(request: Request) {
       }
     }
 
-    // ── Precios PVPC (REData) — mismo rango, independiente de si Datadis falló ──
+    // ── Precios PVPC (REData) — siempre al menos 3 meses hacia atrás ──
     try {
-      send('info', `Sincronizando precios PVPC (${format(startDate, 'MMM yyyy', { locale: es })} → ${format(now, 'MMM yyyy', { locale: es })})...`)
-      const pvpcPrices = await getPvpcPrices(startDate, now)
+      const pvpcStart = isBefore(startDate, startOfMonth(subMonths(now, 3)))
+        ? startDate
+        : startOfMonth(subMonths(now, 3))
+      send('info', `Sincronizando precios PVPC (${format(pvpcStart, 'MMM yyyy', { locale: es })} → ${format(now, 'MMM yyyy', { locale: es })})...`)
+      const pvpcPrices = await getPvpcPrices(pvpcStart, now)
       if (pvpcPrices.length > 0) {
         const seen = new Map(pvpcPrices.map(p => [p.datetime, p]))
         const pvpcRows: PvpcPriceInsert[] = Array.from(seen.values()).map(p => ({
