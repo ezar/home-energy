@@ -457,6 +457,7 @@
     "profileSubtitle": "Share this data with electricity comparison sites to get personalised quotes.",
     "profileAnnualKwh": "Annual consumption",
     "profileMonths": "months",
+    "profileEstimated": "est. from {months}mo",
     "profileP1": "P1 Peak",
     "profileP2": "P2 Mid",
     "profileP3": "P3 Off-Peak",

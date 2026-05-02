@@ -31,23 +31,22 @@ export default async function OffersPage() {
   const dateFnsLocale = locale === 'en' ? enUS : es
 
   const now = new Date()
-  const startDate = startOfMonth(subMonths(now, 23))
 
   const [profileResult, consumptionResult, pvpcResult] = await Promise.all([
     supabase.from('profiles')
       .select('tariff_type, price_p1_eur_kwh, price_p2_eur_kwh, price_p3_eur_kwh, power_kw, power_price_eur_kw_month')
       .eq('id', user.id).single(),
+    // Fetch most-recent rows first so the limit doesn't cut off recent months
     supabase.from('consumption')
       .select('datetime, consumption_kwh, period')
       .eq('user_id', user.id)
-      .gte('datetime', startDate.toISOString())
-      .order('datetime', { ascending: true })
+      .order('datetime', { ascending: false })
       .limit(20000),
     supabase.from('pvpc_prices')
       .select('datetime, price_eur_kwh')
-      .gte('datetime', startDate.toISOString())
+      .gte('datetime', startOfMonth(subMonths(now, 35)).toISOString())
       .order('datetime', { ascending: true })
-      .limit(18000),
+      .limit(26000),
   ])
 
   const profileData = (profileResult.data ?? {}) as ProfileData
@@ -119,6 +118,11 @@ export default async function OffersPage() {
   // Positive = user paid more than PVPC; negative = user paid less than PVPC
   const totalDiff = totalActual - totalPvpc
 
+  // Annualised consumption: extrapolate from available months if < 12
+  const annualKwh = months.length >= 12
+    ? Math.round(totalKwh)
+    : Math.round((totalKwh / Math.max(months.length, 1)) * 12)
+
   const simMonths = months.map(m => ({
     label: m.label,
     p1Kwh: m.p1Kwh,
@@ -153,9 +157,11 @@ export default async function OffersPage() {
           <div style={{ padding: '10px 14px', borderRadius: 8, background: 'var(--bg-inset)', border: '1px solid var(--border-c)' }}>
             <div style={{ fontSize: 10, color: 'var(--dim)', marginBottom: 4 }}>{t('profileAnnualKwh')}</div>
             <div style={{ fontSize: 22, fontWeight: 700, color: 'var(--text)', fontFamily: 'var(--font-mono)' }}>
-              {Math.round(totalKwh)}
+              {annualKwh}
             </div>
-            <div style={{ fontSize: 10, color: 'var(--dim2)' }}>kWh · {months.length} {t('profileMonths')}</div>
+            <div style={{ fontSize: 10, color: 'var(--dim2)' }}>
+              kWh/año{months.length < 12 ? ` · ${t('profileEstimated', { months: months.length })}` : ` · ${months.length} ${t('profileMonths')}`}
+            </div>
           </div>
           {periodStats.map(({ label, kwh, color }) => (
             <div key={label} style={{ padding: '10px 14px', borderRadius: 8, background: 'var(--bg-inset)', border: '1px solid var(--border-c)' }}>

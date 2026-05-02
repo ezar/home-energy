@@ -457,6 +457,7 @@
     "profileSubtitle": "Comparte estos datos con comparadores de ofertas eléctricas para obtener presupuestos personalizados.",
     "profileAnnualKwh": "Consumo anual",
     "profileMonths": "meses",
+    "profileEstimated": "est. de {months} meses",
     "profileP1": "P1 Punta",
     "profileP2": "P2 Llano",
     "profileP3": "P3 Valle",
