@@ -17,11 +17,15 @@ interface TopbarProps {
 
 export function Topbar({ latestDataAt }: TopbarProps) {
   const [syncing, setSyncing] = useState(false)
+  const [showStalePopover, setShowStalePopover] = useState(false)
   const pathname = usePathname()
   const router = useRouter()
   const t = useTranslations('Topbar')
 
-  const staleData = !latestDataAt || (Date.now() - new Date(latestDataAt).getTime()) > STALE_THRESHOLD_DAYS * 86400000
+  const staleDays = latestDataAt
+    ? Math.floor((Date.now() - new Date(latestDataAt).getTime()) / 86400000)
+    : null
+  const staleData = staleDays === null || staleDays >= STALE_THRESHOLD_DAYS
 
   const pageTitles: Record<string, { title: string; sub: string }> = {
     '/':             { title: t('summaryTitle'),     sub: t('summarySub') },
@@ -67,22 +71,50 @@ export function Topbar({ latestDataAt }: TopbarProps) {
           {now}
         </span>
         {staleData && showSync && (
-          <button
-            onClick={handleSync}
-            disabled={syncing}
-            title={t('staleData')}
-            style={{
-              height: 32, minWidth: 32, padding: '0 8px',
-              borderRadius: 8, display: 'inline-flex', alignItems: 'center', gap: 5,
-              background: 'rgba(245,158,11,0.12)', color: '#f59e0b',
-              border: '1px solid rgba(245,158,11,0.35)',
-              fontSize: 11.5, fontWeight: 500, cursor: 'pointer',
-              fontFamily: 'var(--font-sans)', transition: 'all 0.15s', whiteSpace: 'nowrap',
-            }}
-          >
-            <AlertTriangle size={14} />
-            <span className="topbar-date">{t('staleData')}</span>
-          </button>
+          <div style={{ position: 'relative' }}>
+            <button
+              onClick={() => setShowStalePopover(v => !v)}
+              title={t('staleData')}
+              style={{
+                height: 32, minWidth: 32, padding: '0 8px',
+                borderRadius: 8, display: 'inline-flex', alignItems: 'center', gap: 5,
+                background: 'rgba(245,158,11,0.12)', color: '#f59e0b',
+                border: '1px solid rgba(245,158,11,0.35)',
+                fontSize: 11.5, fontWeight: 500, cursor: 'pointer',
+                fontFamily: 'var(--font-sans)', transition: 'all 0.15s', whiteSpace: 'nowrap',
+              }}
+            >
+              <AlertTriangle size={14} />
+            </button>
+            {showStalePopover && (
+              <>
+                <div
+                  onClick={() => setShowStalePopover(false)}
+                  style={{ position: 'fixed', inset: 0, zIndex: 99 }}
+                />
+                <div style={{
+                  position: 'absolute', top: 38, right: 0, zIndex: 100,
+                  background: 'var(--bg2)', border: '1px solid var(--border-c)',
+                  borderRadius: 10, padding: '12px 14px',
+                  boxShadow: '0 8px 24px rgba(0,0,0,0.18)',
+                  width: 240, fontSize: 12,
+                }}>
+                  <div style={{ display: 'flex', alignItems: 'center', gap: 6, marginBottom: 8, color: '#f59e0b', fontWeight: 600 }}>
+                    <AlertTriangle size={13} />
+                    {t('staleData')}
+                  </div>
+                  <div style={{ color: 'var(--dim)', lineHeight: 1.5, marginBottom: 10 }}>
+                    {staleDays === null
+                      ? t('staleDataNoSync')
+                      : t('staleDataDays', { days: staleDays })}
+                  </div>
+                  <div style={{ color: 'var(--dim2)', fontSize: 11 }}>
+                    {t('staleDataHint')}
+                  </div>
+                </div>
+              </>
+            )}
+          </div>
         )}
         {showSync && (
           <button
