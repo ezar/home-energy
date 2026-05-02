@@ -231,7 +231,7 @@ export async function POST(request: Request) {
               user_id: user.id,
               cups: supply.cups,
               datetime: datetime.toISOString(),
-              max_power_kw: entry.maxPower / 1000,
+              max_power_kw: entry.maxPower,
               period: maxPowerPeriod(entry.period),
             }
           })

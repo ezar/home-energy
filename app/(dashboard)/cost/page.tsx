@@ -145,10 +145,11 @@ export default async function CostePage({ searchParams }: { searchParams: { cups
   const powerTerm = monthlyPowerCost(tariffConfig)
   const bill = applyTaxes(current.totalCost, powerTerm)
 
-  // Proyección fin de mes
+  // Proyección fin de mes (mínimo 5 días para que la extrapolación sea fiable)
   const daysElapsed = getDate(now)
   const daysInMonth = getDaysInMonth(now)
-  const projectedEnergy = daysElapsed > 0 ? current.totalCost / daysElapsed * daysInMonth : 0
+  const hasEnoughDaysForProjection = daysElapsed >= 5
+  const projectedEnergy = hasEnoughDaysForProjection ? current.totalCost / daysElapsed * daysInMonth : 0
   const projectedBill = applyTaxes(projectedEnergy, powerTerm)
 
   const byPeriod = [
@@ -254,7 +255,7 @@ export default async function CostePage({ searchParams }: { searchParams: { cups
           <div style={{ fontSize: 11, color: 'var(--dim2)', marginBottom: 14 }}>
             {t('projectionNote', { days: daysElapsed })}
           </div>
-          {[
+          {hasEnoughDaysForProjection ? [
             { label: t('projectedEnergy'), val: projectedEnergy.toFixed(2), unit: '€', color: '#60a5fa' },
             ...(hasPower ? [{ label: t('projectedPower'), val: powerTerm.toFixed(2), unit: '€', color: '#a78bfa' }] : []),
             { label: t('projectedWithTax'), val: projectedBill.total.toFixed(2), unit: '€', color: COLOR_SUCCESS },
@@ -263,7 +264,11 @@ export default async function CostePage({ searchParams }: { searchParams: { cups
               <span style={{ fontSize: 12, color: 'var(--dim)' }}>{label}</span>
               <span style={{ fontSize: 14, fontWeight: 600, color, fontFamily: 'var(--font-mono)' }}>{val} {unit}</span>
             </div>
-          ))}
+          )) : (
+            <div style={{ fontSize: 12, color: 'var(--dim2)', padding: '8px 0' }}>
+              {t('projectionTooEarly')}
+            </div>
+          )}
           <div style={{ marginTop: 14 }}>
             <div style={{ fontSize: 10, color: 'var(--dim)', marginBottom: 6 }}>
               {t('monthProgress', { elapsed: daysElapsed, total: daysInMonth })}

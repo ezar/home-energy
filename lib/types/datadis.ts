@@ -46,7 +46,7 @@ export interface DatadisMaxPowerEntry {
   cups: string
   date: string       // "2022/07/01"
   time: string       // "01:00"
-  maxPower: number   // en W
+  maxPower: number   // en kW (Datadis devuelve kW, no W)
   period: string     // "VALLE" | "LLANO" | "PUNTA"
 }
 

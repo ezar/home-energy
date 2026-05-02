@@ -31,22 +31,23 @@ export default async function OffersPage() {
   const dateFnsLocale = locale === 'en' ? enUS : es
 
   const now = new Date()
+  const startDate = startOfMonth(subMonths(now, 23))
 
   const [profileResult, consumptionResult, pvpcResult] = await Promise.all([
     supabase.from('profiles')
       .select('tariff_type, price_p1_eur_kwh, price_p2_eur_kwh, price_p3_eur_kwh, power_kw, power_price_eur_kw_month')
       .eq('id', user.id).single(),
-    // Fetch most-recent rows first so the limit doesn't cut off recent months
     supabase.from('consumption')
       .select('datetime, consumption_kwh, period')
       .eq('user_id', user.id)
+      .gte('datetime', startDate.toISOString())
       .order('datetime', { ascending: false })
       .limit(20000),
     supabase.from('pvpc_prices')
       .select('datetime, price_eur_kwh')
-      .gte('datetime', startOfMonth(subMonths(now, 35)).toISOString())
+      .gte('datetime', startDate.toISOString())
       .order('datetime', { ascending: true })
-      .limit(26000),
+      .limit(18000),
   ])
 
   const profileData = (profileResult.data ?? {}) as ProfileData
@@ -131,7 +132,7 @@ export default async function OffersPage() {
     actualCost: m.actualCost,
   }))
 
-  const hasComparison = totalPvpc > 0 && months.length > 0
+  const hasComparison = months.length > 0
 
   const periodStats = [
     { label: t('profileP1'), kwh: totalP1, color: PERIOD_COLORS[1] },
@@ -211,14 +212,14 @@ export default async function OffersPage() {
           {/* Summary totals */}
           <div style={{ display: 'flex', gap: 10, flexWrap: 'wrap', marginBottom: 16 }}>
             {[
-              { label: t('yourCost'), val: `${totalActual.toFixed(0)} €`, note: `${months.length} ${t('profileMonths')}`, color: undefined },
-              { label: t('pvpcCost'), val: `${totalPvpc.toFixed(0)} €`, note: `${pvpcCoveragePct}% ${t('pvpcCoverage')}`, color: undefined },
-              {
+              { label: t('yourCost'), val: totalActual > 0 ? `${totalActual.toFixed(0)} €` : '—', note: `${months.length} ${t('profileMonths')}`, color: undefined },
+              { label: t('pvpcCost'), val: totalPvpc > 0 ? `${totalPvpc.toFixed(0)} €` : '—', note: totalPvpc > 0 ? `${pvpcCoveragePct}% ${t('pvpcCoverage')}` : t('pvpcNoData'), color: undefined },
+              ...(totalPvpc > 0 ? [{
                 label: t('difference'),
                 val: `${Math.abs(totalDiff) < 1 ? '~0' : (totalDiff > 0 ? '+' : '') + totalDiff.toFixed(0)} €`,
                 note: totalDiff > 1 ? t('yourTariffPricier') : totalDiff < -1 ? t('yourTariffCheaper') : t('noSignificantDiff'),
                 color: totalDiff > 1 ? COLOR_DANGER : totalDiff < -1 ? COLOR_SUCCESS : undefined,
-              },
+              }] : []),
             ].map(({ label, val, note, color }) => (
               <div key={label} style={{ flex: '1 1 120px', padding: '10px 14px', borderRadius: 8, background: 'var(--bg-inset)', border: '1px solid var(--border-c)' }}>
                 <div style={{ fontSize: 10, color: 'var(--dim)', marginBottom: 4 }}>{label}</div>
