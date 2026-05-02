@@ -66,16 +66,23 @@ export function Topbar({ latestDataAt }: TopbarProps) {
         <span className="topbar-date" style={{ fontSize: 11, color: 'var(--dim)', whiteSpace: 'nowrap' }}>
           {now}
         </span>
-        {staleData && (
-          <div title={t('staleData')} style={{
-            display: 'inline-flex', alignItems: 'center', gap: 4,
-            fontSize: 10.5, fontWeight: 500, color: '#f59e0b',
-            background: 'rgba(245,158,11,0.12)', border: '1px solid rgba(245,158,11,0.3)',
-            borderRadius: 6, padding: '3px 7px', whiteSpace: 'nowrap',
-          }}>
-            <AlertTriangle size={11} />
+        {staleData && showSync && (
+          <button
+            onClick={handleSync}
+            disabled={syncing}
+            title={t('staleData')}
+            style={{
+              height: 32, minWidth: 32, padding: '0 8px',
+              borderRadius: 8, display: 'inline-flex', alignItems: 'center', gap: 5,
+              background: 'rgba(245,158,11,0.12)', color: '#f59e0b',
+              border: '1px solid rgba(245,158,11,0.35)',
+              fontSize: 11.5, fontWeight: 500, cursor: 'pointer',
+              fontFamily: 'var(--font-sans)', transition: 'all 0.15s', whiteSpace: 'nowrap',
+            }}
+          >
+            <AlertTriangle size={14} />
             <span className="topbar-date">{t('staleData')}</span>
-          </div>
+          </button>
         )}
         {showSync && (
           <button
