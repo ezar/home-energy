@@ -37,11 +37,21 @@ export default async function PvpcPage({ searchParams }: { searchParams: { cups?
   const consumptionRows = (consumptionResult.data ?? []) as HourlyRow[]
   const pvpcRows = (pvpcResult.data ?? []) as PvpcRow[]
   const supplies = (suppliesResult.data ?? []) as Pick<UserSupplyRow, 'cups' | 'display_name'>[]
-  const pvpcMap = new Map(pvpcRows.map((p) => [p.datetime, p.price_eur_kwh]))
+  const pvpcMap = new Map(pvpcRows.map((p) => [p.datetime.substring(0, 13), p.price_eur_kwh]))
+
+  function lookupPvpc(datetime: string): number | null {
+    const ms = new Date(datetime).getTime()
+    for (const offsetH of [0, 1, 2]) {
+      const key = new Date(ms - offsetH * 3_600_000).toISOString().substring(0, 13)
+      const price = pvpcMap.get(key)
+      if (price !== undefined) return price
+    }
+    return null
+  }
 
   const data: ChartDataPoint[] = consumptionRows.map((r) => {
     const dt = new Date(r.datetime)
-    const priceEurKwh = pvpcMap.get(r.datetime) ?? null
+    const priceEurKwh = lookupPvpc(r.datetime)
     return {
       datetime: r.datetime,
       hour: format(dt, 'dd/MM HH:mm'),

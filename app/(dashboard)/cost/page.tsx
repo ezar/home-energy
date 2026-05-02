@@ -39,8 +39,8 @@ export default async function CostePage({ searchParams }: { searchParams: { cups
       .single(),
     (() => {
       let q = supabase.from('maximeter').select('datetime, max_power_kw, period')
-        .eq('user_id', user.id).gte('datetime', startOfMonth(now).toISOString())
-        .order('max_power_kw', { ascending: false }).limit(10)
+        .eq('user_id', user.id)
+        .order('datetime', { ascending: false }).limit(10)
       if (selectedCups) q = q.eq('cups', selectedCups)
       return q
     })(),
@@ -98,7 +98,16 @@ export default async function CostePage({ searchParams }: { searchParams: { cups
       const [{ data: consumptionRaw }, { data: pvpcRaw }] = await Promise.all(queries)
       const consumption = (consumptionRaw ?? []) as CRow[]
       const pvpc = (pvpcRaw ?? []) as PRow[]
-      const pvpcMap = new Map(pvpc.map(p => [p.datetime, p.price_eur_kwh]))
+      const pvpcHourMap = new Map(pvpc.map(p => [p.datetime.substring(0, 13), p.price_eur_kwh]))
+      const lookupPvpc = (datetime: string): number | null => {
+        const ms = new Date(datetime).getTime()
+        for (const offsetH of [0, 1, 2]) {
+          const key = new Date(ms - offsetH * 3_600_000).toISOString().substring(0, 13)
+          const price = pvpcHourMap.get(key)
+          if (price !== undefined) return price
+        }
+        return null
+      }
 
       let totalKwh = 0, totalCost = 0, marketCost = 0, marketCoveredKwh = 0
       let p1Kwh = 0, p2Kwh = 0, p3Kwh = 0
@@ -107,7 +116,7 @@ export default async function CostePage({ searchParams }: { searchParams: { cups
       const dailyMap = new Map<number, number>()
       for (const r of consumption) {
         const period = (r.period ?? 3) as 1 | 2 | 3
-        const pvpcPrice = pvpcMap.get(r.datetime) ?? null
+        const pvpcPrice = lookupPvpc(r.datetime)
         const price = getEnergyPrice(period, pvpcPrice, tariffConfig)
         const cost = r.consumption_kwh * price
         totalKwh += r.consumption_kwh
@@ -334,11 +343,12 @@ export default async function CostePage({ searchParams }: { searchParams: { cups
         const contracted = tariffConfig.powerKw ?? 0
         const exceeded = contracted > 0 && peakKw > contracted
         const peakColor = exceeded ? COLOR_DANGER : COLOR_SUCCESS
+        const peakMonth = format(new Date(peak.datetime), 'MMMM yyyy', { locale: dateFnsLocale })
         return (
           <div style={{ ...CARD, borderColor: exceeded ? 'rgba(248,113,113,0.3)' : 'var(--border-c)' }}>
             <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: 14 }}>
               <div style={{ fontSize: 10.5, fontWeight: 600, color: 'var(--dim)', textTransform: 'uppercase', letterSpacing: '0.1em' }}>
-                {t('maximeter', { month: format(now, 'MMMM yyyy', { locale: dateFnsLocale }) })}
+                {t('maximeter', { month: peakMonth })}
               </div>
               {exceeded && (
                 <div style={{ fontSize: 10.5, fontWeight: 600, color: COLOR_DANGER, background: 'rgba(248,113,113,0.1)', border: '1px solid rgba(248,113,113,0.25)', borderRadius: 6, padding: '3px 9px' }}>
