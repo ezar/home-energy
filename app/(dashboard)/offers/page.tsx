@@ -31,7 +31,7 @@ export default async function OffersPage() {
   const dateFnsLocale = locale === 'en' ? enUS : es
 
   const now = new Date()
-  const startDate = startOfMonth(subMonths(now, 11))
+  const startDate = startOfMonth(subMonths(now, 23))
 
   const [profileResult, consumptionResult, pvpcResult] = await Promise.all([
     supabase.from('profiles')
@@ -42,12 +42,12 @@ export default async function OffersPage() {
       .eq('user_id', user.id)
       .gte('datetime', startDate.toISOString())
       .order('datetime', { ascending: true })
-      .limit(12000),
+      .limit(20000),
     supabase.from('pvpc_prices')
       .select('datetime, price_eur_kwh')
       .gte('datetime', startDate.toISOString())
       .order('datetime', { ascending: true })
-      .limit(9000),
+      .limit(18000),
   ])
 
   const profileData = (profileResult.data ?? {}) as ProfileData
@@ -106,7 +106,6 @@ export default async function OffersPage() {
   const months = Array.from(monthMap.values())
     .filter(m => m.totalKwh > 0)
     .sort((a, b) => a.key.localeCompare(b.key))
-    .slice(-12)
 
   const totalKwh    = months.reduce((s, m) => s + m.totalKwh,  0)
   const totalP1     = months.reduce((s, m) => s + m.p1Kwh,     0)
@@ -197,7 +196,7 @@ export default async function OffersPage() {
       {hasComparison && (
         <div style={CARD}>
           <div style={{ fontSize: 10.5, fontWeight: 600, color: 'var(--dim)', textTransform: 'uppercase', letterSpacing: '0.1em', marginBottom: 4 }}>
-            {t('pvpcCompTitle')}
+            {t('pvpcCompTitle', { months: months.length })}
           </div>
           <div style={{ fontSize: 11, color: 'var(--dim2)', marginBottom: 14, lineHeight: 1.5 }}>
             {isFixed ? t('pvpcCompSubFixed') : t('pvpcCompSubPvpc')}
@@ -261,9 +260,9 @@ export default async function OffersPage() {
       {simMonths.length > 0 && (
         <TariffSimulator
           months={simMonths}
-          currentP1={isFixed ? tariffConfig.priceP1 : null}
-          currentP2={isFixed ? tariffConfig.priceP2 : null}
-          currentP3={isFixed ? tariffConfig.priceP3 : null}
+          currentP1={null}
+          currentP2={null}
+          currentP3={null}
         />
       )}
 

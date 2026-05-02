@@ -465,7 +465,7 @@
     "profileTariffFixed": "Fixed rate",
     "profileTariffPvpc": "PVPC (variable)",
     "profileTip": "Use the annual kWh, P1/P2/P3 breakdown and contracted power when requesting quotes from electricity retailers.",
-    "pvpcCompTitle": "Your tariff vs PVPC market · 12 months",
+    "pvpcCompTitle": "Your tariff vs PVPC market · {months} months",
     "pvpcCompSubFixed": "Comparison between your fixed rate and what you would have paid at PVPC variable market prices.",
     "pvpcCompSubPvpc": "You are on the PVPC tariff. The table shows your actual costs. Use the tariff simulator below to compare with fixed-rate options.",
     "yourCost": "Your tariff",

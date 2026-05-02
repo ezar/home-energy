@@ -465,7 +465,7 @@
     "profileTariffFixed": "Precio fijo",
     "profileTariffPvpc": "PVPC (variable)",
     "profileTip": "Usa el consumo anual en kWh, el desglose P1/P2/P3 y la potencia contratada al solicitar presupuestos a comercializadoras.",
-    "pvpcCompTitle": "Tu tarifa vs mercado PVPC · 12 meses",
+    "pvpcCompTitle": "Tu tarifa vs mercado PVPC · {months} meses",
     "pvpcCompSubFixed": "Comparativa entre tu tarifa fija y lo que habrías pagado a precios variables del mercado PVPC.",
     "pvpcCompSubPvpc": "Estás en tarifa PVPC. La tabla muestra tus costes reales. Usa el simulador de tarifas para comparar con opciones de precio fijo.",
     "yourCost": "Tu tarifa",
