@@ -58,23 +58,13 @@ export default async function OffersPage() {
   const pvpcRows = (pvpcResult.data ?? []) as Pick<PvpcPriceRow, 'datetime' | 'price_eur_kwh'>[]
 
   // PVPC lookup: "YYYY-MM-DDTHH" → price (hourly)
-  // Datadis datetimes are stored as local Spanish time treated as UTC (no DST correction).
-  // REData PVPC datetimes are stored in true UTC. In CEST (summer, UTC+2) this causes a
-  // 2-hour offset; in CET (winter, UTC+1) a 1-hour offset. We check the exact key and
-  // also 1h and 2h earlier to handle both seasons without requiring a data migration.
   const pvpcMap = new Map<string, number>()
   for (const row of pvpcRows) {
     pvpcMap.set(row.datetime.substring(0, 13), row.price_eur_kwh)
   }
 
   function lookupPvpc(datetime: string): number | undefined {
-    const ms = new Date(datetime).getTime()
-    for (const offsetH of [0, 1, 2]) {
-      const key = new Date(ms - offsetH * 3_600_000).toISOString().substring(0, 13)
-      const price = pvpcMap.get(key)
-      if (price !== undefined) return price
-    }
-    return undefined
+    return pvpcMap.get(datetime.substring(0, 13))
   }
 
   // Aggregate consumption by month

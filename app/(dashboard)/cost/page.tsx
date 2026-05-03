@@ -99,15 +99,6 @@ export default async function CostePage({ searchParams }: { searchParams: { cups
       const consumption = (consumptionRaw ?? []) as CRow[]
       const pvpc = (pvpcRaw ?? []) as PRow[]
       const pvpcHourMap = new Map(pvpc.map(p => [p.datetime.substring(0, 13), p.price_eur_kwh]))
-      const lookupPvpc = (datetime: string): number | null => {
-        const ms = new Date(datetime).getTime()
-        for (const offsetH of [0, 1, 2]) {
-          const key = new Date(ms - offsetH * 3_600_000).toISOString().substring(0, 13)
-          const price = pvpcHourMap.get(key)
-          if (price !== undefined) return price
-        }
-        return null
-      }
 
       let totalKwh = 0, totalCost = 0, marketCost = 0, marketCoveredKwh = 0
       let p1Kwh = 0, p2Kwh = 0, p3Kwh = 0
@@ -116,7 +107,7 @@ export default async function CostePage({ searchParams }: { searchParams: { cups
       const dailyMap = new Map<number, number>()
       for (const r of consumption) {
         const period = (r.period ?? 3) as 1 | 2 | 3
-        const pvpcPrice = lookupPvpc(r.datetime)
+        const pvpcPrice = pvpcHourMap.get(r.datetime.substring(0, 13)) ?? null
         const price = getEnergyPrice(period, pvpcPrice, tariffConfig)
         const cost = r.consumption_kwh * price
         totalKwh += r.consumption_kwh
