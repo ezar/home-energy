@@ -36,7 +36,7 @@ export default async function OffersPage() {
   const dateFnsLocale = locale === 'en' ? enUS : es
 
   const now = new Date()
-  const startDate = startOfMonth(subMonths(now, 23))
+  const startDate = startOfMonth(subMonths(now, 11))
 
   const [profileResult, rpcResult] = await Promise.all([
     supabase.from('profiles')
