@@ -46,7 +46,7 @@ export default async function OffersPage() {
     supabase.from('pvpc_prices')
       .select('datetime, price_eur_kwh')
       .gte('datetime', startDate.toISOString())
-      .order('datetime', { ascending: true })
+      .order('datetime', { ascending: false })
       .limit(18000),
   ])
 
