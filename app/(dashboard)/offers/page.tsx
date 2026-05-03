@@ -3,7 +3,7 @@ import { getTranslations, getLocale } from 'next-intl/server'
 import { TariffSimulator } from '@/app/(dashboard)/cost/TariffSimulator'
 import { startOfMonth, subMonths, format } from 'date-fns'
 import { es, enUS } from 'date-fns/locale'
-import type { ProfileRow, PvpcPriceRow } from '@/lib/supabase/types-helper'
+import type { ProfileRow } from '@/lib/supabase/types-helper'
 import { tariffConfigFromProfile } from '@/lib/pricing'
 import { PERIOD_COLORS, COLOR_SUCCESS, COLOR_DANGER } from '@/lib/constants'
 import { CARD_STYLE as CARD } from '@/lib/ui-styles'
@@ -11,10 +11,15 @@ import { ExternalLink, Scale } from 'lucide-react'
 
 export const dynamic = 'force-dynamic'
 
-type ConsRow = { datetime: string; consumption_kwh: number; period: number }
 type ProfileData = Pick<ProfileRow,
   'tariff_type' | 'price_p1_eur_kwh' | 'price_p2_eur_kwh' | 'price_p3_eur_kwh' |
   'power_kw' | 'power_price_eur_kw_month'>
+
+type MonthRow = {
+  month: string
+  p1_kwh: number; p2_kwh: number; p3_kwh: number; total_kwh: number
+  pvpc_cost: number; pvpc_kwh: number
+}
 
 type MonthBucket = {
   key: string; label: string
@@ -33,83 +38,38 @@ export default async function OffersPage() {
   const now = new Date()
   const startDate = startOfMonth(subMonths(now, 23))
 
-  const [profileResult, consumptionResult, pvpcResult] = await Promise.all([
+  const [profileResult, rpcResult] = await Promise.all([
     supabase.from('profiles')
       .select('tariff_type, price_p1_eur_kwh, price_p2_eur_kwh, price_p3_eur_kwh, power_kw, power_price_eur_kw_month')
       .eq('id', user.id).single(),
-    supabase.from('consumption')
-      .select('datetime, consumption_kwh, period')
-      .eq('user_id', user.id)
-      .gte('datetime', startDate.toISOString())
-      .order('datetime', { ascending: false })
-      .limit(20000),
-    supabase.from('pvpc_prices')
-      .select('datetime, price_eur_kwh')
-      .gte('datetime', startDate.toISOString())
-      .order('datetime', { ascending: false })
-      .limit(18000),
+    (supabase as any).rpc('get_monthly_offers_data', {
+      p_user_id: user.id,
+      p_start: startDate.toISOString(),
+    }),
   ])
 
   const profileData = (profileResult.data ?? {}) as ProfileData
   const tariffConfig = tariffConfigFromProfile(profileData)
   const isFixed = tariffConfig.tariffType === 'fixed'
 
-  const consumptionRows = (consumptionResult.data ?? []) as ConsRow[]
-  const pvpcRows = (pvpcResult.data ?? []) as Pick<PvpcPriceRow, 'datetime' | 'price_eur_kwh'>[]
-
-  // PVPC lookup: "YYYY-MM-DDTHH" → price (hourly)
-  const pvpcMap = new Map<string, number>()
-  for (const row of pvpcRows) {
-    pvpcMap.set(row.datetime.substring(0, 13), row.price_eur_kwh)
-  }
-
-  function lookupPvpc(datetime: string): number | undefined {
-    return pvpcMap.get(datetime.substring(0, 13))
-  }
-
-  // Aggregate consumption by month
-  const monthMap = new Map<string, MonthBucket>()
-  for (const row of consumptionRows) {
-    const key = row.datetime.substring(0, 7) // "YYYY-MM"
-    if (!monthMap.has(key)) {
-      const d = new Date(key + '-01T12:00:00Z')
-      monthMap.set(key, {
-        key,
+  const months: MonthBucket[] = ((rpcResult.data ?? []) as MonthRow[])
+    .filter(r => r.total_kwh > 0)
+    .map(r => {
+      const d = new Date(r.month + '-01T12:00:00Z')
+      const p1 = Number(r.p1_kwh), p2 = Number(r.p2_kwh), p3 = Number(r.p3_kwh)
+      const actualCost = isFixed
+        ? p1 * (tariffConfig.priceP1 ?? 0) + p2 * (tariffConfig.priceP2 ?? 0) + p3 * (tariffConfig.priceP3 ?? 0)
+        : Number(r.pvpc_cost)
+      return {
+        key: r.month,
         label: format(d, 'MMM yyyy', { locale: dateFnsLocale }),
-        p1Kwh: 0, p2Kwh: 0, p3Kwh: 0, totalKwh: 0,
-        actualCost: 0, pvpcCost: 0, pvpcKwh: 0,
-      })
-    }
-    const bucket = monthMap.get(key)!
-    const kwh = row.consumption_kwh
-    const period = row.period as 1 | 2 | 3
-
-    if (period === 1) bucket.p1Kwh += kwh
-    else if (period === 2) bucket.p2Kwh += kwh
-    else bucket.p3Kwh += kwh
-    bucket.totalKwh += kwh
-
-    // Actual energy cost (pre-tax, energy term)
-    const pvpcPrice = lookupPvpc(row.datetime)
-    if (isFixed) {
-      const price = period === 1 ? (tariffConfig.priceP1 ?? 0)
-                  : period === 2 ? (tariffConfig.priceP2 ?? 0)
-                  : (tariffConfig.priceP3 ?? 0)
-      bucket.actualCost += kwh * price
-    } else if (pvpcPrice !== undefined) {
-      bucket.actualCost += kwh * pvpcPrice
-    }
-
-    // PVPC cost (market reference)
-    if (pvpcPrice !== undefined) {
-      bucket.pvpcCost += kwh * pvpcPrice
-      bucket.pvpcKwh += kwh
-    }
-  }
-
-  const months = Array.from(monthMap.values())
-    .filter(m => m.totalKwh > 0)
-    .sort((a, b) => a.key.localeCompare(b.key))
+        p1Kwh: p1, p2Kwh: p2, p3Kwh: p3,
+        totalKwh: Number(r.total_kwh),
+        actualCost,
+        pvpcCost: Number(r.pvpc_cost),
+        pvpcKwh: Number(r.pvpc_kwh),
+      }
+    })
 
   const totalKwh    = months.reduce((s, m) => s + m.totalKwh,  0)
   const totalP1     = months.reduce((s, m) => s + m.p1Kwh,     0)
@@ -120,19 +80,15 @@ export default async function OffersPage() {
   const pvpcKwhTotal = months.reduce((s, m) => s + m.pvpcKwh,  0)
   const pvpcCoveragePct = totalKwh > 0 ? Math.round((pvpcKwhTotal / totalKwh) * 100) : 0
 
-  // Positive = user paid more than PVPC; negative = user paid less than PVPC
   const totalDiff = totalActual - totalPvpc
 
-  // Annualised consumption: extrapolate from available months if < 12
   const annualKwh = months.length >= 12
     ? Math.round(totalKwh)
     : Math.round((totalKwh / Math.max(months.length, 1)) * 12)
 
   const simMonths = months.map(m => ({
     label: m.label,
-    p1Kwh: m.p1Kwh,
-    p2Kwh: m.p2Kwh,
-    p3Kwh: m.p3Kwh,
+    p1Kwh: m.p1Kwh, p2Kwh: m.p2Kwh, p3Kwh: m.p3Kwh,
     actualCost: m.actualCost,
   }))
 
@@ -213,7 +169,6 @@ export default async function OffersPage() {
             {isFixed ? t('pvpcCompSubFixed') : t('pvpcCompSubPvpc')}
           </div>
 
-          {/* Summary totals */}
           <div style={{ display: 'flex', gap: 10, flexWrap: 'wrap', marginBottom: 16 }}>
             {[
               { label: t('yourCost'), val: totalActual > 0 ? `${totalActual.toFixed(0)} €` : '—', note: `${months.length} ${t('profileMonths')}`, color: undefined },
@@ -233,7 +188,6 @@ export default async function OffersPage() {
             ))}
           </div>
 
-          {/* Monthly breakdown table */}
           <div style={{ display: 'grid', gridTemplateColumns: '1fr repeat(3, auto)', borderTop: '1px solid var(--border-subtle)', paddingTop: 12 }}>
             {[t('colMonth'), t('yourCost'), t('pvpcCost'), t('colDiff')].map(h => (
               <div key={h} style={{ fontSize: 9.5, fontWeight: 600, color: 'var(--dim)', textTransform: 'uppercase', letterSpacing: '0.06em', padding: '3px 8px', borderBottom: '1px solid var(--border-c)', textAlign: h === t('colMonth') ? 'left' : 'right' }}>
@@ -267,7 +221,6 @@ export default async function OffersPage() {
         </div>
       )}
 
-      {/* Tariff simulator */}
       {simMonths.length > 0 && (
         <TariffSimulator
           months={simMonths}
@@ -277,7 +230,6 @@ export default async function OffersPage() {
         />
       )}
 
-      {/* External comparison links */}
       <div style={CARD}>
         <div style={{ fontSize: 10.5, fontWeight: 600, color: 'var(--dim)', textTransform: 'uppercase', letterSpacing: '0.1em', marginBottom: 10 }}>
           {t('externalTitle')}
