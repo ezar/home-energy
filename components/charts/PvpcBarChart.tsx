@@ -17,7 +17,7 @@ export function PvpcBarChart({ data, height = 130, ariaLabel = 'Gráfico de prec
           </linearGradient>
         </defs>
         <CartesianGrid strokeDasharray="3 3" stroke="var(--grid-line)" vertical={false} />
-        <XAxis dataKey="hour" tickFormatter={(h: number) => `${h}h`} tick={{ fontSize: 10, fill: 'var(--dim)' }} tickLine={false} axisLine={false} interval={3} />
+        <XAxis dataKey="hour" tickFormatter={(h: number) => `${h}h`} tick={{ fontSize: 10, fill: 'var(--dim)' }} tickLine={false} axisLine={false} interval="preserveStartEnd" minTickGap={25} />
         <YAxis tick={{ fontSize: 10, fill: 'var(--dim)' }} tickLine={false} axisLine={false} tickFormatter={(v: number) => v.toFixed(2)} width={36} />
         <Tooltip
           formatter={(v: number) => [`${v.toFixed(5)} €/kWh`, 'PVPC']}

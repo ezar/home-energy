@@ -18,7 +18,7 @@ export function HomeDailyChart({ data, avgKwh, ariaLabel = 'Tendencia de consumo
     <ResponsiveContainer width="100%" height={120}>
       <BarChart data={data} margin={{ top: 4, right: 4, bottom: 0, left: -20 }}>
         <CartesianGrid strokeDasharray="3 3" stroke="var(--grid-line)" vertical={false} />
-        <XAxis dataKey="day" tick={{ fontSize: 9, fill: 'var(--dim)' }} tickLine={false} axisLine={false} interval={4} />
+        <XAxis dataKey="day" tick={{ fontSize: 9, fill: 'var(--dim)' }} tickLine={false} axisLine={false} interval="preserveStartEnd" minTickGap={40} />
         <YAxis tick={{ fontSize: 9, fill: 'var(--dim)' }} tickLine={false} axisLine={false} tickFormatter={(v: number) => v.toFixed(0)} width={28} />
         <Tooltip
           contentStyle={{ background: 'var(--bg2)', border: '1px solid var(--border-c)', borderRadius: 8, fontSize: 11 }}

@@ -108,7 +108,7 @@ export function PvpcView({ data, avgPricePaid, avgMarketPrice }: Props) {
                 ))}
               </defs>
               <CartesianGrid strokeDasharray="3 3" stroke="var(--grid-line)" vertical={false} />
-              <XAxis dataKey="hour" tick={{ fontSize: 10, fill: 'var(--dim)' }} tickLine={false} axisLine={false} interval={range === '48h' ? 5 : range === '7d' ? 11 : 47} />
+              <XAxis dataKey="hour" tick={{ fontSize: 10, fill: 'var(--dim)' }} tickLine={false} axisLine={false} interval="preserveStartEnd" minTickGap={55} />
               <YAxis yAxisId="kwh" tick={{ fontSize: 10, fill: 'var(--dim)' }} tickLine={false} axisLine={false} tickFormatter={(v: number) => v.toFixed(1)} width={32} />
               <YAxis yAxisId="pvpc" orientation="right" tick={false} tickLine={false} axisLine={false} width={8} />
               <Tooltip content={<CustomTooltip />} />

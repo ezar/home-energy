@@ -49,7 +49,7 @@ export function HourlyConsumptionChart({ data, showPvpc, ariaLabel = 'Gráfico d
           ))}
         </defs>
         <CartesianGrid strokeDasharray="3 3" stroke="var(--grid-line)" vertical={false} />
-        <XAxis dataKey="hour" tick={{ fontSize: 10, fill: 'var(--dim)' }} tickLine={false} axisLine={false} interval={3} />
+        <XAxis dataKey="hour" tick={{ fontSize: 10, fill: 'var(--dim)' }} tickLine={false} axisLine={false} interval="preserveStartEnd" minTickGap={60} />
         <YAxis yAxisId="kwh" tick={{ fontSize: 10, fill: 'var(--dim)' }} tickLine={false} axisLine={false} tickFormatter={(v: number) => v.toFixed(1)} width={32} />
         {showPvpc && (
           <YAxis yAxisId="pvpc" orientation="right" tick={false} tickLine={false} axisLine={false} width={8} />

@@ -23,7 +23,7 @@ export function MonthlyConsumptionChart({ data, ariaLabel = 'Gráfico de consumo
           </linearGradient>
         </defs>
         <CartesianGrid strokeDasharray="3 3" stroke="var(--grid-line)" vertical={false} />
-        <XAxis dataKey="month" tick={{ fontSize: 10, fill: 'var(--dim)' }} tickLine={false} axisLine={false} />
+        <XAxis dataKey="month" tick={{ fontSize: 10, fill: 'var(--dim)' }} tickLine={false} axisLine={false} minTickGap={28} />
         <YAxis tick={{ fontSize: 10, fill: 'var(--dim)' }} tickLine={false} axisLine={false} tickFormatter={(v: number) => `${v}`} width={36} />
         <Tooltip
           formatter={(v: number) => [`${v} kWh`, 'Consumo']}

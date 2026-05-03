@@ -17,7 +17,7 @@ export function CostLineChart({ data, height = 130, ariaLabel = 'Gráfico de cos
           </linearGradient>
         </defs>
         <CartesianGrid strokeDasharray="3 3" stroke="var(--grid-line)" vertical={false} />
-        <XAxis dataKey="day" tick={{ fontSize: 10, fill: 'var(--dim)' }} tickLine={false} axisLine={false} interval="preserveStartEnd" />
+        <XAxis dataKey="day" tick={{ fontSize: 10, fill: 'var(--dim)' }} tickLine={false} axisLine={false} interval="preserveStartEnd" minTickGap={40} />
         <YAxis tick={{ fontSize: 10, fill: 'var(--dim)' }} tickLine={false} axisLine={false} tickFormatter={(v: number) => `${v.toFixed(0)}€`} width={36} />
         <Tooltip
           formatter={(v: number) => [`${v.toFixed(2)} €`, 'Acumulado']}

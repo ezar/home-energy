@@ -48,7 +48,7 @@ export function DailyConsumptionChart({ data, ariaLabel = 'Gráfico de consumo d
           </linearGradient>
         </defs>
         <CartesianGrid strokeDasharray="3 3" stroke="var(--grid-line)" vertical={false} />
-        <XAxis dataKey="label" tick={{ fontSize: 10, fill: 'var(--dim)' }} tickLine={false} axisLine={false} interval="preserveStartEnd" />
+        <XAxis dataKey="label" tick={{ fontSize: 10, fill: 'var(--dim)' }} tickLine={false} axisLine={false} interval="preserveStartEnd" minTickGap={40} />
         <YAxis tick={{ fontSize: 10, fill: 'var(--dim)' }} tickLine={false} axisLine={false} tickFormatter={(v: number) => v.toFixed(1)} width={32} />
         <Tooltip content={<CustomTooltip />} />
         <Bar dataKey="totalKwh" radius={[2, 2, 0, 0]} maxBarSize={20}>

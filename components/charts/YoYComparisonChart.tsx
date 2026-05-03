@@ -62,7 +62,7 @@ export function YoYComparisonChart({ data, labelThisYear, labelLastYear }: Props
     <ResponsiveContainer width="100%" height={160}>
       <BarChart data={data} barCategoryGap="20%" barGap={2} margin={{ top: 4, right: 4, bottom: 0, left: -20 }}>
         <CartesianGrid vertical={false} stroke="var(--grid-line)" strokeDasharray="3 3" />
-        <XAxis dataKey="label" tick={{ fontSize: 10, fill: 'var(--dim)' }} axisLine={false} tickLine={false} />
+        <XAxis dataKey="label" tick={{ fontSize: 10, fill: 'var(--dim)' }} axisLine={false} tickLine={false} minTickGap={25} />
         <YAxis tick={{ fontSize: 9, fill: 'var(--dim)' }} axisLine={false} tickLine={false} width={32} />
         <Tooltip
           content={(props) => (

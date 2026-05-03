@@ -26,6 +26,7 @@ export function HomeMonthlyChart({ data, avgKwh, ariaLabel = 'Annual consumption
             tickLine={false}
             axisLine={false}
             tickFormatter={(v: string) => MONTH_ABBR[Number(v.split('-')[1]) - 1] ?? v}
+            minTickGap={28}
           />
           <YAxis
             tick={{ fontSize: 9, fill: 'var(--dim)' }}
