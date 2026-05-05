@@ -8,7 +8,7 @@ import { getToken, getConsumption, getMaxPower, datadisDatetimeToDate } from '@/
 import { getPvpcPrices } from '@/lib/redata'
 import { getPeriod } from '@/lib/tariff'
 import { decrypt } from '@/lib/encrypt'
-import { format, subDays, startOfDay } from 'date-fns'
+import { format, subMonths } from 'date-fns'
 
 export const dynamic = 'force-dynamic'
 export const maxDuration = 300
@@ -45,8 +45,7 @@ export async function GET(request: NextRequest) {
   }
 
   const now = new Date()
-  const startDate = startOfDay(subDays(now, 5))
-  const startDateStr = toDatadisMonth(startDate)
+  const startDateStr = toDatadisMonth(subMonths(now, 1))
   const endDateStr = toDatadisMonth(now)
 
   const results: Array<{ userId: string; cups: string; synced: number; maximeter: number; error?: string }> = []
@@ -149,7 +148,7 @@ export async function GET(request: NextRequest) {
 
   // PVPC — una sola vez para todos los usuarios
   try {
-    const pvpcPrices = await getPvpcPrices(startDate, now)
+    const pvpcPrices = await getPvpcPrices(subMonths(now, 1), now)
     if (pvpcPrices.length > 0) {
       await serviceClient
         .from('pvpc_prices')
