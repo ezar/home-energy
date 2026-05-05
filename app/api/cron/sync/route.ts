@@ -45,7 +45,7 @@ export async function GET(request: NextRequest) {
   }
 
   const now = new Date()
-  const startDate = startOfDay(subDays(now, 3))
+  const startDate = startOfDay(subDays(now, 5))
   const startDateStr = toDatadisMonth(startDate)
   const endDateStr = toDatadisMonth(now)
 
@@ -119,7 +119,7 @@ export async function GET(request: NextRequest) {
                 user_id: profile.id,
                 cups: supply.cups,
                 datetime: datetime.toISOString(),
-                max_power_kw: entry.maxPower / 1000,
+                max_power_kw: entry.maxPower,
                 period: maxPowerPeriod(entry.period),
               }
             })
