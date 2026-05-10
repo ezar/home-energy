@@ -1,6 +1,6 @@
 # Energy Dashboard
 
-Dashboard privado de consumo eléctrico doméstico. Conecta con la API de [Datadis](https://datadis.es) (datos reales del contador inteligente) y con [REData](https://www.ree.es/es/apidatos) (precio PVPC horario de Red Eléctrica) para mostrar consumo, coste estimado y comparativa de precios de mercado.
+Dashboard privado de consumo eléctrico doméstico. Conecta con la API de [Datadis](https://datadis.es) (datos reales del contador inteligente) y con [REData](https://www.ree.es/es/apidatos) (precio PVPC horario de Red Eléctrica) para mostrar consumo, coste estimado, comparativa de precios de mercado y recomendaciones de tarifa.
 
 ## Stack
 
@@ -16,10 +16,11 @@ Dashboard privado de consumo eléctrico doméstico. Conecta con la API de [Datad
 ## Funcionalidades
 
 - **Home** — stats del mes en curso, desglose P1/P2/P3, consumo diario, mejor hora PVPC y sugerencias de carga por electrodoméstico
-- **Consumo** — gráficas horaria, diaria, mensual, patrón semanal y heatmap; detección de anomalías; exportación CSV
-- **Coste** — estimación de factura con desglose de energía, potencia, impuesto eléctrico e IVA; simulador de tarifa alternativa
-- **PVPC** — comparativa entre consumo real y precio de mercado; horas baratas y caras
-- **Configuración** — credenciales Datadis, multi-suministro (varios CUPS), tarifa fija/PVPC, objetivo mensual, notificaciones push
+- **Consumo** — gráficas horaria, diaria y mensual; heatmap; comparativa año anterior; patrón semanal; detección de anomalías; exportación CSV
+- **Coste** — estimación de factura con desglose de energía, potencia, impuesto eléctrico e IVA; coste acumulado del mes
+- **PVPC** — comparativa entre consumo real y precio de mercado horario; horas baratas y caras del día
+- **Ofertas** — perfil de consumo por períodos P1/P2/P3; comparativa coste real vs PVPC en los últimos 12 meses; simulador de tarifa fija alternativa; enlace al comparador oficial CNMC
+- **Configuración** — credenciales Datadis, multi-suministro (varios CUPS), tarifa fija o PVPC con precios personalizados, potencia contratada, objetivo mensual de kWh, notificaciones push
 
 ## Tarifas soportadas
 
@@ -35,46 +36,61 @@ Festivos calculados dinámicamente (incluye Semana Santa con algoritmo de Meeus)
 
 ```
 app/
-  (auth)/login|register/   → Rutas públicas
+  (auth)/
+    login/                 → Inicio de sesión
+    register/              → Registro (allowlist de emails)
   (dashboard)/             → Rutas protegidas (middleware)
-    page.tsx               → Home
+    page.tsx               → Home — resumen del mes
     consumption/           → Gráficas de consumo
     cost/                  → Estimación de factura
-    pvpc/                  → Comparativa mercado
-    settings/              → Configuración
+    pvpc/                  → Comparativa mercado horario
+    offers/                → Comparativa de ofertas y simulador
+    settings/              → Configuración de cuenta
+    help/                  → Ayuda y preguntas frecuentes
+    welcome/               → Onboarding primer acceso
   api/
     datadis/sync/          → POST: fetch Datadis + upsert DB
     datadis/supplies/      → GET: suministros del usuario
     datadis/credentials/   → PATCH: guardar contraseña cifrada
     pvpc/sync/             → POST: sincronizar precios REData
-    cron/sync/             → GET: sync diario automático (CRON_SECRET)
-    push/                  → GET/POST/DELETE: notificaciones push
+    cron/sync/             → GET: sync Datadis + PVPC diario (05:00 UTC)
+    cron/pvpc-alert/       → GET: notificación precio PVPC bajo (20:00 UTC)
+    cron/consumption-alert/→ GET: notificación consumo elevado (opcional)
+    push/                  → GET/POST/DELETE: suscripciones push
+    user/delete/           → DELETE: borrar cuenta y datos
 lib/
   datadis.ts               → Cliente API Datadis
   redata.ts                → Cliente API REData (PVPC)
   tariff.ts                → Lógica de períodos 2.0TD + festivos
   pricing.ts               → Cálculo de precios e impuestos
+  encrypt.ts               → Cifrado/descifrado de credenciales
+  webpush.ts               → Envío de notificaciones push (VAPID)
   constants.ts             → Colores y tokens compartidos
   supabase/                → Clientes server y browser
 components/
-  charts/                  → Todos los componentes Recharts
+  charts/                  → Componentes Recharts (horario, diario, mensual,
+                             heatmap, PVPC, YoY, patrón, coste acumulado)
   dashboard/               → Cards, selectores, badges
   layout/                  → Shell, sidebar, topbar, nav móvil
 ```
 
 ## Variables de entorno
 
-Crea un archivo `.env.local` en la raíz con:
+Crea un archivo `.env.local` en la raíz:
 
 ```env
 NEXT_PUBLIC_SUPABASE_URL=
 NEXT_PUBLIC_SUPABASE_ANON_KEY=
 SUPABASE_SERVICE_ROLE_KEY=
 CRON_SECRET=
-# Opcional — notificaciones push
+
+# Notificaciones push (Web Push / VAPID)
 VAPID_PUBLIC_KEY=
 VAPID_PRIVATE_KEY=
+VAPID_EMAIL=
 ```
+
+Las variables `NEXT_PUBLIC_*` se exponen al cliente. Las demás son exclusivamente server-side.
 
 ## Desarrollo local
 
@@ -95,11 +111,18 @@ npx supabase db push # aplicar migraciones
 ## Seguridad
 
 - Las credenciales Datadis nunca se envían al cliente — todas las llamadas son server-side
-- La contraseña se guarda cifrada en Supabase Vault / columna `bytea`
-- RLS activado en todas las tablas de usuario
+- La contraseña se guarda cifrada (`bytea` con AES-256) en Supabase
+- RLS activado en todas las tablas de usuario (`profiles`, `consumption`, `maximeter`, `user_supplies`)
+- `pvpc_prices` es pública (datos compartidos, sin RLS)
 - Acceso restringido a emails en allowlist vía Supabase Auth
 
-## Cron automático
+## Crons automáticos
 
-El sync diario se ejecuta a las **05:00 UTC** via Vercel Cron (`/api/cron/sync`).  
-Requiere la variable `CRON_SECRET` y la entrada correspondiente en `vercel.json`.
+Configurados en `vercel.json` y ejecutados por Vercel:
+
+| Ruta | Horario | Función |
+|---|---|---|
+| `/api/cron/sync` | 05:00 UTC | Sincroniza consumo Datadis + precios PVPC del mes anterior y actual |
+| `/api/cron/pvpc-alert` | 20:00 UTC | Envía notificación push si el precio de mañana es bajo |
+
+Todos los endpoints de cron requieren la cabecera `Authorization: Bearer {CRON_SECRET}`.
